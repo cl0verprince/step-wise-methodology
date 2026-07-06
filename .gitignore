@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea/
+.vscode/
+
+# Context-meter runtime state (per-session prediction history)
+claude-context-meter/
+
+# Secrets — never commit (see skills/secret-safe-commits)
+.env
+*.key
+*.pem

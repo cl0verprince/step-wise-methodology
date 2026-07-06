@@ -24,8 +24,14 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | `secret-safe-commits` | committing — never leak `.env`, keys, or credentials |
 | `craftsmanship-bar` | holding code to clean, reviewable, no-slop, matches-the-docs standards |
 | `agentic-step-execution` | using subagents / parallel workflows to build a step |
+| `context-meter` | showing a context-usage traffic light in the Claude Code status line |
 
-Plus a bundled **`context-meter`** status-line script (🟢/🟡/🔴 context-usage traffic light).
+The **`context-meter`** ships a bundled, stdlib-only status-line script
+(`skills/context-meter/scripts/context_meter.py`): a 🟢/🟡/🔴 traffic light with
+the live token count, the true window size (200k or 1M), and an estimate of
+where context lands after the next turn — rendered at the bottom of the Claude
+Code pane inside PyCharm / VS Code. See its `SKILL.md` for the one-line
+`settings.json` block to enable it.
 
 ## License
 
