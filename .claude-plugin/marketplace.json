@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "stepwise",
+  "description": "The step-wise methodology plugin — deliberate, gated, readable project delivery.",
+  "owner": {
+    "name": "cl0verprince",
+    "url": "https://github.com/cl0verprince"
+  },
+  "plugins": [
+    {
+      "name": "step-wise-methodology",
+      "source": "./",
+      "description": "Build any new project or major feature in deliberate, planned, acceptance-tested, approval-gated numbered steps. Language-agnostic.",
+      "version": "0.1.0",
+      "homepage": "https://github.com/cl0verprince/step-wise-methodology",
+      "repository": "https://github.com/cl0verprince/step-wise-methodology",
+      "license": "MIT",
+      "keywords": ["methodology", "greenfield", "planning", "step-wise"]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+# === Secrets — never commit ===
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+service-account*.json
+*credentials*.json
+secrets.*
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# === Python ===
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# === Node / JS ===
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log
+
+# === Rust ===
+/target/
+
+# === Go ===
+/bin/
+
+# === Build & logs ===
+dist/
+build/
+out/
+*.log
