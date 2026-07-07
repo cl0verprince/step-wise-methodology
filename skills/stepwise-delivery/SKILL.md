@@ -36,6 +36,7 @@ concrete `# Required Output`, then the ordered `# Steps`.
 1. Write the step's `stepN_name/design.md` (traces to the Required Output).
 2. Build the slice — solo, or via `agentic-step-execution` when independent
    slices fan out. Implement test-first (`superpowers:test-driven-development`).
+   Recommend the model for the work (see **Model policy**); the user runs `/model`.
 3. Hold the bar (`craftsmanship-bar`): clean code **and** docs updated in the
    same change — including `plan.md`, the `design.md`, `decisions.json`,
    `workflow.json`.
@@ -53,6 +54,15 @@ handoff said "next".
 the full `# Required Output` (System Integration Test). Regenerate the browser
 docs. Then `superpowers:finishing-a-development-branch`.
 
+## Model policy
+Since this methodology hands mechanical edits to a cheaper model, be deliberate
+about which one: **Opus plans, designs, and reviews; Sonnet executes mechanical
+work.** You cannot switch your own model — recommend the best one for each step
+and its *why*, and the user runs `/model`.
+- **The only downshift is Sonnet.** **Never recommend Haiku for execution** — too
+  risky for building steps. **Never recommend or suggest Fable**, ever. If the
+  user proposes Haiku or Fable, advise against it and steer back to Opus or Sonnet.
+
 ## The approval gate (non-negotiable)
 After each step's UAT, **stop and report to the human** — what was built, UAT
 result per criterion, what the next step is. **Only the human advances to the
@@ -64,3 +74,4 @@ gate. This is the single invariant every other skill defers to.
 - Building step N+1 because step N's UAT passed — the *human* clears the gate, not the test
 - One big commit for "the whole feature" instead of a commit per gated step
 - Reaching Phase 4 with `plan.md` / `design.md` / `decisions.json` describing behavior the code no longer has
+- Recommending Haiku or Fable for a step — the only execution downshift is Sonnet

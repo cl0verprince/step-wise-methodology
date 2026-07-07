@@ -11,7 +11,7 @@
       "name": "step-wise-methodology",
       "source": "./",
       "description": "Build any new project or major feature in deliberate, planned, acceptance-tested, approval-gated numbered steps. Language-agnostic.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "homepage": "https://github.com/cl0verprince/step-wise-methodology",
       "repository": "https://github.com/cl0verprince/step-wise-methodology",
       "license": "MIT",
