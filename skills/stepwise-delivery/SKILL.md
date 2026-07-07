@@ -44,6 +44,11 @@ concrete `# Required Output`, then the ordered `# Steps`.
 5. Commit (`secret-safe-commits`: scan the staged diff — mandatory, not a glance).
 6. **STOP at the approval gate** (below).
 
+If context runs high mid-step (the `context-meter` shows 🟡/🔴), use
+`session-handoff` to write a `HANDOFF.md` and continue in a fresh session — the
+gate travels with you: a new session does not clear a step just because the
+handoff said "next".
+
 **Phase 4 — SIT & close.** Run the whole general conductor end-to-end and check
 the full `# Required Output` (System Integration Test). Regenerate the browser
 docs. Then `superpowers:finishing-a-development-branch`.

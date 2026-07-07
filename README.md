@@ -25,6 +25,7 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | `craftsmanship-bar` | holding code to clean, reviewable, no-slop, matches-the-docs standards |
 | `agentic-step-execution` | using subagents / parallel workflows to build a step |
 | `context-meter` | showing a context-usage traffic light in the Claude Code status line |
+| `session-handoff` | context is running high — write a tight `HANDOFF.md` to resume in a fresh session |
 
 The **`context-meter`** ships a bundled, stdlib-only status-line script
 (`skills/context-meter/scripts/context_meter.py`): a 🟢/🟡/🔴 traffic light with
