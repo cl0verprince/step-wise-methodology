@@ -30,7 +30,9 @@ concrete `# Required Output`, then the ordered `# Steps`.
 → `secret-safe-commits` (`.gitignore` + `.env.example` **before the first commit**),
 → `deterministic-conductors` (the reproducible entry-point skeleton),
 → `browser-readable-project-docs` (copy `render_docs.py`, seed `decisions.json` /
-`workflow.json`).
+`workflow.json`),
+→ `pipeline-architect` (derive the CI/CD pipeline from `plan.md`'s Required
+Output and run the gates in CI — deploy/release stays behind the human gate).
 
 **Phase 3 — The step loop.** For each numbered step, in order:
 1. Write the step's `stepN_name/design.md` (traces to the Required Output).

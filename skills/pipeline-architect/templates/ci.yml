@@ -1,0 +1,78 @@
+# Universal CI baseline + release-on-tag archetype (GitHub Actions).
+#
+# Drop into a project's .github/workflows/. This is the REFERENCE pipeline for a
+# library / CLI / plugin: it runs the methodology's gates on every push/PR
+# (secret scan, deterministic conductor, UAT/SIT) and cuts a GitHub Release when
+# a vX.Y.Z tag is pushed. For a service, frontend, or data-science project,
+# keep the `gates` job and swap the `release` job for that archetype's delivery
+# (see pipeline-architect SKILL.md). Steps assume Python; adapt to your language.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]        # release-on-tag: a human pushing the tag triggers release
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write        # release job needs this to create the GitHub Release
+
+jobs:
+  gates:
+    # The universal baseline — the automated backstop for the manual gates.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history so the secret scan sees every commit
+
+      # Gate 1 — secret scan (backstop for secret-safe-commits).
+      # gitleaks-action is free for personal/public repos; orgs need a license.
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install
+        run: pip install -r requirements.txt
+        # No requirements.txt yet? Replace with your project's install step.
+
+      # Gate 2 — reproducibility: the general conductor must run clean.
+      - name: Reproduce (conductor)
+        run: python conductor.py
+        # Adapt to your conductor's entry point (Makefile, conductor.mjs, …).
+
+      # Gate 3 — the tests that back every step's UAT and the SIT.
+      - name: UAT / SIT
+        run: pytest tests/
+
+  release:
+    # Release-on-tag archetype. Runs ONLY for vX.Y.Z tags, and only after the
+    # gates pass. The human minted the tag; CI just packages and publishes.
+    needs: gates
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" --generate-notes
+
+      # Publishing to a registry is opt-in — uncomment and add the token for
+      # PyPI / npm / crates once you actually distribute the package.
+      # - name: Publish to PyPI
+      #   env:
+      #     TWINE_USERNAME: __token__
+      #     TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      #   run: |
+      #     pip install build twine
+      #     python -m build
+      #     twine upload dist/*

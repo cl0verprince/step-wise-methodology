@@ -24,6 +24,7 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | `secret-safe-commits` | committing — never leak `.env`, keys, or credentials |
 | `craftsmanship-bar` | holding code to clean, reviewable, no-slop, matches-the-docs standards |
 | `agentic-step-execution` | using subagents / parallel workflows to build a step |
+| `pipeline-architect` | deriving the right CI/CD pipeline from `plan.md` and running the gates in CI |
 | `context-meter` | showing a context-usage traffic light in the Claude Code status line |
 | `session-handoff` | context is running high — write a tight `HANDOFF.md` to resume in a fresh session |
 
