@@ -25,8 +25,23 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | `craftsmanship-bar` | holding code to clean, reviewable, no-slop, matches-the-docs standards |
 | `agentic-step-execution` | using subagents / parallel workflows to build a step |
 | `pipeline-architect` | connecting the repo to GitHub (init → push → branch protection) and deriving the right CI gates from `plan.md` + the pipeline maturity ladder, in approval-gated stages |
-| `context-meter` | showing a context-usage traffic light in the Claude Code status line |
+| `context-meter` | showing context usage, turn count, and session duration as a traffic light in the Claude Code status line |
 | `session-handoff` | context is running high — write a tight `HANDOFF.md` to resume in a fresh session |
+
+## Project state model
+
+A step-wise project's durable state is four small root files, each owning exactly one concern:
+
+| File | Owns | Maintained via |
+|---|---|---|
+| `plan.md` | the **contract** — goal, required output, ordered steps (never status) | `authoring-the-master-plan` |
+| `workflow.json` | the **canonical step status** — `done` / `in_progress` / `pending` | every skill that starts, finishes, or adds a step |
+| `pipeline.md` | the **delivery posture** — archetype, CI maturity level, active gates | `pipeline-architect` |
+| `HANDOFF.md` | the **volatile last-session memory**, pointing at the rest | `session-handoff` |
+
+(`decisions.json` remains the why-log, rendered to HTML by `browser-readable-project-docs`.)
+
+**The re-entry rule:** every skill detects before it creates. If its artifact already exists it reconciles and extends — it never re-scaffolds. Invoked on an existing project, `stepwise-delivery` reads these four files first, reports where the project stands, and resumes at the right phase.
 
 The **`context-meter`** ships a bundled, stdlib-only status-line script
 (`skills/context-meter/scripts/context_meter.py`): a 🟢/🟡/🔴 traffic light with

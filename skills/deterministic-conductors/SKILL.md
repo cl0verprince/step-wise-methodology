@@ -26,3 +26,22 @@ Every conductor run shows a live, **in-place** bar (redraws on the same line via
 
 ## Templates
 Start from `templates/conductor.py`, `templates/conductor.mjs`, or `templates/conductor.sh` — each seeds from config, shows an in-place progress bar, and runs the steps in order.
+
+## When re-invoked — extend, don't rebuild
+A conductor already exists? Add to it — never generate a fresh skeleton beside
+or over it:
+- **New step:** register the new step (appended, or inserted mid-list) in the
+  existing pipeline list (the templates' `build_pipeline()`), seeded and
+  pinned like the rest, in the order `plan.md` states.
+- **Keep it in step with `workflow.json`:** the steps the conductor runs and
+  the steps the status file tracks are the same list — update both in the
+  same change.
+- **Wire docs regeneration** as the pipeline's final step — run
+  `render_docs.py` (see `browser-readable-project-docs`) so the browser docs
+  can never go stale.
+
+## Red flags — STOP
+- A second entry point appearing (`run_all.py` next to `conductor.py`) — one conductor, extended
+- Two runs with the same config producing different output — that's not a conductor
+- A step wired into the conductor but missing from `workflow.json`, or vice versa
+- A hardcoded absolute path or an unseeded RNG smuggled in with a new step

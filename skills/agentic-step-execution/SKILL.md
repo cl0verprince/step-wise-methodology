@@ -15,6 +15,7 @@ Agents readily invent ad-hoc, non-loadable locations for a role they will reuse 
 - **Reusable agent roles → `.claude/agents/<name>.md`** — native format (`name` / `description` / `tools` / `model` frontmatter + a system-prompt body). Version-controlled, human-reviewable, and actually loadable as a named subagent. Start from `templates/agent-definition.md`.
 - **Reusable workflow scripts → `workflows/`.**
 - **The save rule:** save an agent role when it will be used **more than once** (a recurring `uat-runner`, `step-implementer`, `reviewer`). A genuinely single-use dispatch stays **inline** — don't clutter the repo, and don't ask each time; the >1× rule decides.
+- **The reuse rule:** before creating a role, check `.claude/agents/` — if it already exists, **load and dispatch it as-is**; edit it only when the step's contract actually changed. Never mint a `uat-runner-2`.
 
 ## Discipline
 - **Fan out only independent slices.** Anything with a real dependency stays sequential.

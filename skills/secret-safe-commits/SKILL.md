@@ -14,7 +14,9 @@ Evidence this is real: strong models refuse both blatant and subtle secrets, but
 
 ## Layer 1 — Prevent (at project setup / step 0)
 - Add `.gitignore` **before the first commit**, from `templates/gitignore`: covers `.env`, `*.key`, `*.pem`, `id_rsa*`, `*.p12`, `service-account*.json`, credential files.
+- A `.gitignore` **already exists? Merge, don't replace** — append the template's secret patterns that are missing; never delete entries that are already there.
 - Secrets live only in `.env` (git-ignored). Commit `.env.example` (key names, no values) from `templates/env.example`.
+- **Keep `.env.example` current:** every time a new key lands in `.env`, add its name (no value) to `.env.example` in the same change — a stale example file is how the next contributor hardcodes the key instead.
 
 ## Layer 2 — Scan the staged diff before EVERY commit
 ```

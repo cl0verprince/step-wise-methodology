@@ -21,7 +21,9 @@ level or nags.
 Create `HANDOFF.md` at the project root from `templates/HANDOFF.md`:
 - **Goal** — one line, **by reference** to `plan.md` (restate in full only if there
   is no plan.md).
-- **Current step / status** — where the work actually is.
+- **Current step / status** — by reference to `workflow.json` (the canonical
+  status file); add only what it can't say, the mid-step nuance ("step 3
+  in_progress, UAT written but failing on the date parser").
 - **Last 4 turns** — *the point of this file.* What changed in the latest
   iterations and the decisions made **with their why**. This is what a fresh
   session most lacks.
@@ -36,9 +38,13 @@ Create `HANDOFF.md` at the project root from `templates/HANDOFF.md`:
   next action — not a second copy of the durable docs.
 - **Tighter than the transcript.** It must fit one screen. A handoff longer than
   the conversation it replaces has failed at its one job.
-- **Durable record first.** In a stepwise project, bring `decisions.json` current
-  **before** writing the handoff — the handoff is the volatile companion, not a
-  replacement for the permanent log (see `browser-readable-project-docs`).
+- **Durable record first.** In a stepwise project, bring `decisions.json` **and
+  `workflow.json`** current **before** writing the handoff — the handoff is the
+  volatile companion, not a replacement for the permanent record (see
+  `browser-readable-project-docs`).
+- **One HANDOFF.md.** A previous handoff exists? Overwrite it — it described a
+  session that is now over, and its history lives in git. Two handoffs means
+  the next session guesses which one is true.
 - **Resume rule.** A fresh session's first act is: read `HANDOFF.md` → the linked
   docs → resume at *Next action*. **The human approval gate travels with you** —
   a new session does not clear a step's gate just because the handoff said "next"

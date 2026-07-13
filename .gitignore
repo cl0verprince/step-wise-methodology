@@ -13,3 +13,6 @@ claude-context-meter/
 .env
 *.key
 *.pem
+
+# Playwright MCP session artifacts
+.playwright-mcp/

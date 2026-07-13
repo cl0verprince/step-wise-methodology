@@ -3,7 +3,7 @@
 Reads the status-line JSON on stdin (documented at
 https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
 
-    🟢 12% ctx (98k/1.0M) · next ~15%
+    🟢 12% ctx (98k/1.0M) · next ~15% · 23 turns · 1h42m
 
 - Traffic light 🟢/🟡/🔴 for how full the context window is right now.
 - Live token count and the true window size (200k or the extended 1M).
@@ -11,10 +11,18 @@ https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
   from the moving average of recent per-turn growth. Honest, not precise: the
   dominant unknown is how large the next tool result is, so it is shown as an
   estimate and flagged ⚠ when the next turn is likely to cross the red line.
+- "N turns · 1h42m" — how many exchanges (real user prompts) this session has
+  had and how long it has been running, from the transcript JSONL.
 
-Everything comes from the stdin JSON — the large transcript JSONL is never
-read. Prediction needs cross-invocation memory, so a tiny bounded state file
-(the last few readings per session) is kept in a temp dir. Every side effect is
+Token math comes from the stdin JSON alone. The transcript is read
+INCREMENTALLY: a byte offset is kept per session, so each status-line tick
+reads only the lines appended since the last one — one full pass is paid only
+the first time a session is seen. Turns are counted by cheap substring checks
+(no per-line JSON parsing): a turn is a user-typed prompt, not a tool result
+flowing back and not a meta entry.
+
+Cross-invocation memory (prediction samples, transcript offset/tally) lives in
+a tiny bounded state file per session in a temp dir. Every side effect is
 guarded: a status line must NEVER crash or hang, so on any error this prints a
 neutral fallback and exits 0. No network, ever.
 
@@ -26,6 +34,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Traffic light thresholds, as a percentage of the context window used.
@@ -45,6 +54,16 @@ def _fmt_tokens(n: int) -> str:
     return str(n)
 
 
+def _fmt_duration(seconds: float) -> str:
+    """95s -> '1m', 6120s -> '1h42m'. Coarse on purpose — it's a glance."""
+    minutes = int(seconds // 60)
+    if minutes < 1:
+        return f"{max(int(seconds), 0)}s"
+    if minutes < 60:
+        return f"{minutes}m"
+    return f"{minutes // 60}h{minutes % 60:02d}m"
+
+
 def _light(pct: float) -> str:
     if pct < GREEN_BELOW:
         return "🟢"
@@ -54,7 +73,7 @@ def _light(pct: float) -> str:
 
 
 def _state_path(session_id: str) -> Path:
-    """Per-session history file in a temp dir (never under Claude's own dirs)."""
+    """Per-session state file in a temp dir (never under Claude's own dirs)."""
     base = os.environ.get("CLAUDE_CONTEXT_METER_DIR") or (
         Path(tempfile.gettempdir()) / "claude-context-meter"
     )
@@ -65,34 +84,37 @@ def _state_path(session_id: str) -> Path:
     return base / f"{safe}.json"
 
 
-def _update_history(session_id: str, used_tokens: int) -> list:
-    """Append used_tokens if it changed (a real turn), return recent samples.
-
-    Guarded: if the state file can't be read or written, prediction is simply
-    skipped — it must never take the status line down.
-    """
-    if not session_id:
-        return []
-    path = _state_path(session_id)
-    samples = []
+def _load_state(path: Path) -> dict:
     try:
-        samples = json.loads(path.read_text(encoding="utf-8")).get("samples", [])
+        state = json.loads(path.read_text(encoding="utf-8"))
+        return state if isinstance(state, dict) else {}
     except (OSError, ValueError):
-        samples = []
+        return {}
 
-    # Only record a new point when the window actually grew/changed — status
-    # lines re-run on a timer too, and those idle re-runs must not skew deltas.
-    if not samples or samples[-1] != used_tokens:
-        samples.append(used_tokens)
-    samples = samples[-MAX_SAMPLES:]
 
-    try:  # atomic-ish write; failure just means no persisted history this run
+def _save_state(path: Path, state: dict) -> None:
+    """Atomic-ish write; failure just means no persisted memory this run."""
+    try:
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"samples": samples}), encoding="utf-8")
+        tmp.write_text(json.dumps(state), encoding="utf-8")
         tmp.replace(path)
     except OSError:
         pass
-    return samples
+
+
+def _append_sample(state: dict, used_tokens: int) -> list:
+    """Record used_tokens if it changed (a real turn), return recent samples.
+
+    Status lines re-run on a timer too; those idle re-runs must not skew the
+    per-turn growth deltas, so unchanged readings are not appended.
+    """
+    samples = state.get("samples")
+    if not isinstance(samples, list):
+        samples = []
+    if not samples or samples[-1] != used_tokens:
+        samples.append(used_tokens)
+    state["samples"] = samples[-MAX_SAMPLES:]
+    return state["samples"]
 
 
 def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
@@ -109,8 +131,80 @@ def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
     return min(used_tokens + round(avg_growth), window)
 
 
+def _tally_transcript(state: dict, transcript_path: str) -> None:
+    """Incrementally tally turns + session start from the transcript JSONL.
+
+    Only bytes appended since the stored offset are read; the offset is rewound
+    to the start of a trailing half-written line so it is re-read complete next
+    tick. A turn = a line with a user type marker but no tool-result payload
+    and no meta flag — substring checks keep this O(new bytes) with no JSON
+    parsing. Errors leave the previous tally untouched.
+    """
+    if not transcript_path:
+        return
+    try:
+        size = os.path.getsize(transcript_path)
+    except OSError:
+        return
+
+    t = state.get("transcript")
+    if (
+        not isinstance(t, dict)
+        or t.get("path") != transcript_path
+        or t.get("offset", 0) > size          # file was replaced/truncated
+    ):
+        t = {"path": transcript_path, "offset": 0, "turns": 0, "start": None}
+
+    try:
+        with open(transcript_path, "rb") as fh:
+            fh.seek(t["offset"])
+            chunk = fh.read(size - t["offset"])
+    except OSError:
+        return
+
+    lines = chunk.split(b"\n")
+    partial = lines.pop()                     # possibly half-written last line
+    t["offset"] = size - len(partial)
+
+    for line in lines:
+        if (b'"type":"user"' in line or b'"type": "user"' in line) and (
+            b'"toolUseResult"' not in line and b'"isMeta":true' not in line
+        ):
+            t["turns"] += 1
+        if t["start"] is None:
+            marker = b'"timestamp":"'
+            i = line.find(marker)
+            if i >= 0:
+                start = i + len(marker)
+                t["start"] = line[start : start + 32].split(b'"')[0].decode(
+                    "ascii", "replace"
+                )
+
+    state["transcript"] = t
+
+
+def _session_suffix(state: dict) -> str:
+    """' · 23 turns · 1h42m' from the tallied transcript state, or ''."""
+    t = state.get("transcript") or {}
+    parts = []
+    if t.get("turns"):
+        parts.append(f"{t['turns']} turn{'s' if t['turns'] != 1 else ''}")
+    start = t.get("start")
+    if start:
+        try:
+            begun = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            if begun.tzinfo is None:
+                begun = begun.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - begun).total_seconds()
+            if elapsed >= 0:
+                parts.append(_fmt_duration(elapsed))
+        except ValueError:
+            pass
+    return ("".join(f" · {p}" for p in parts)) if parts else ""
+
+
 def render(data: dict) -> str:
-    """Pure: status JSON -> the one-line string. All logic is testable here."""
+    """Status JSON -> the one-line string. All logic lives here, guarded."""
     cw = data.get("context_window") or {}
     window = cw.get("context_window_size")
 
@@ -130,8 +224,19 @@ def render(data: dict) -> str:
     if used_pct is None:
         used_pct = used_tokens / window * 100
 
-    samples = _update_history(data.get("session_id", ""), used_tokens)
+    session_id = data.get("session_id", "")
+    state_file = _state_path(session_id) if session_id else None
+    state = _load_state(state_file) if state_file else {}
+
+    samples = _append_sample(state, used_tokens)
     predicted = _predict_next(samples, used_tokens, window)
+    try:
+        _tally_transcript(state, data.get("transcript_path") or "")
+    except Exception:
+        pass                                  # tally is a bonus, never a risk
+
+    if state_file:
+        _save_state(state_file, state)
 
     line = (
         f"{_light(used_pct)} {round(used_pct)}% ctx "
@@ -141,7 +246,7 @@ def render(data: dict) -> str:
         pred_pct = predicted / window * 100
         warn = " ⚠" if pred_pct >= YELLOW_BELOW > used_pct else ""
         line += f" · next ~{round(pred_pct)}%{warn}"
-    return line
+    return line + _session_suffix(state)
 
 
 def _emit(text: str) -> None:

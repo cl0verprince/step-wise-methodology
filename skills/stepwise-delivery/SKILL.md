@@ -1,6 +1,6 @@
 ---
 name: stepwise-delivery
-description: Use when starting any new project or building a major new feature, component, or subsystem from scratch — greenfield "let's build X" work worth doing in deliberate, planned, acceptance-tested, approval-gated numbered steps. Drives the whole phased workflow and calls the other step-wise skills in order.
+description: Use when starting any new project or building a major new feature, component, or subsystem from scratch — greenfield "let's build X" work worth doing in deliberate, planned, acceptance-tested, approval-gated numbered steps — AND when resuming or continuing an existing step-wise project ("continue the project", "where were we", a repo that already has plan.md/workflow.json). Drives the whole phased workflow and calls the other step-wise skills in order.
 ---
 
 # Stepwise Delivery (orchestrator)
@@ -17,6 +17,17 @@ no checkable contract, no per-step stop, docs drifting behind code. This skill
 holds the shape.
 
 ## The phases (run in order)
+
+**Phase R — Re-enter (whenever the project isn't empty).** Step-wise files
+already exist? Read the **project state model** first — `plan.md` (the
+contract), `workflow.json` (the canonical step status), `pipeline.md` (the
+delivery posture), `HANDOFF.md` (the last session's volatile memory) — then
+**report where the project stands** (current step, gate state, open threads)
+and continue at the matching phase below. Never re-run scaffolding that
+already exists, and never re-open a step marked `done` unless the human asks.
+A missing file means that concern hasn't come up yet — supply it when its
+phase arrives (a missing `HANDOFF.md` just means no handoff happened), never
+by restarting.
 
 **Phase 0 — Frame.** Before any file exists, settle *what* and *why*.
 → `superpowers:brainstorming` (required). Do not skip to planning until intent,
@@ -36,7 +47,10 @@ push, branch protection — then derive the CI gates from `plan.md`'s Required
 Output and the maturity ladder, in staged, per-stage-approved setup; record
 the level in `pipeline.md`; deploy/release stays behind the human gate).
 
-**Phase 3 — The step loop.** For each numbered step, in order:
+**Phase 3 — The step loop.** For each numbered step, in order. `workflow.json`
+is the **canonical step status**: mark the step `in_progress` when it starts,
+and `done` only when the human clears its gate — `plan.md` stays the contract
+and never carries progress markers.
 1. Write the step's `stepN_name/design.md` (traces to the Required Output).
 2. Build the slice — solo, or via `agentic-step-execution` when independent
    slices fan out. Implement test-first (`superpowers:test-driven-development`).
@@ -73,7 +87,13 @@ result per criterion, what the next step is. **Only the human advances to the
 next step.** A subagent, a passing UAT, or your own confidence never clears the
 gate. This is the single invariant every other skill defers to.
 
+When the human clears the gate, flip the step to `done` in `workflow.json`
+(and the next step to `in_progress` as it starts) in a small status commit at
+the top of the next step's work — the build commits themselves stay one per
+gated step.
+
 ## Red flags — STOP
+- Re-scaffolding (Phase 0–2) a project whose `plan.md` / conductor already exist — re-enter via Phase R instead
 - Starting to code before `plan.md` has a testable Goal + Required Output
 - Building step N+1 because step N's UAT passed — the *human* clears the gate, not the test
 - One big commit for "the whole feature" instead of a commit per gated step

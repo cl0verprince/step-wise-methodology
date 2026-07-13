@@ -23,3 +23,22 @@ Every step's UAT and the final SIT trace back to these. If a step can't be trace
 
 ## Template
 Start from `templates/plan.md`. Keep it lean: the contract plus the ordered step list, nothing padded. Each step links to its own `stepN_name/design.md`.
+
+## When re-invoked — review or amend, never re-author
+A `plan.md` already exists? Work on it, don't replace it:
+- **Review** it against this skill: is the Goal testable? Is every acceptance
+  criterion objectively checkable? Does every step trace to the Required
+  Output? Report exactly what fails and propose the minimal fix.
+- **Amend** when scope genuinely changed: update Goal / Required Output /
+  Steps deliberately and log the *why* in `decisions.json`. Step numbers
+  never change once assigned — insert a mid-list step with a letter suffix
+  (`step3b_caching`), don't renumber.
+- **Status never lives here.** `plan.md` is the contract; `workflow.json` is
+  the canonical step status (see `browser-readable-project-docs`). No
+  checkboxes, no "(done)" markers in the step list.
+
+## Red flags — STOP
+- Steps written before the Goal + Required Output are nailed down
+- An acceptance criterion no test or command could verify ("works well", "clean code")
+- Rewriting an existing `plan.md` from scratch when asked to review or update it
+- Progress markers creeping into the step list — status belongs in `workflow.json`
