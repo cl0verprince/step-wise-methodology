@@ -125,6 +125,72 @@ def test_legacy_payload(env):
     assert run({"exceeds_200k_tokens": True}) == "🔴 ctx >200k"
 
 
+def seed_state(env, session, state):
+    d = env / "state"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{session}.json").write_text(json.dumps(state), encoding="utf-8")
+
+
+def payload_tokens(session, inp, window=200_000, extra=None):
+    p = {
+        "session_id": session,
+        "context_window": {
+            "context_window_size": window,
+            "total_input_tokens": inp,
+            "total_output_tokens": 0,
+        },
+    }
+    if extra:
+        p.update(extra)
+    return p
+
+
+def test_red_eta_shown_with_enough_history(env):
+    t0 = time.time() - 360
+    seed_state(env, "eta", {"samples": [
+        [120_000, t0], [130_000, t0 + 120], [140_000, t0 + 240], [150_000, t0 + 360],
+    ]})
+    out = run(payload_tokens("eta", 150_000))
+    # 20k tokens to red at ~83 tok/s -> ~4m; predicted next (160k = 80%) < red
+    assert "red ~4m" in out
+    assert "next ~" not in out
+    assert "handoff" not in out
+
+
+def test_next_fallback_when_history_thin(env):
+    t0 = time.time() - 300
+    seed_state(env, "thin", {"samples": [[90_000, t0], [110_000, t0 + 120]]})
+    out = run(payload_tokens("thin", 110_000))
+    assert "next ~" in out           # 1 growth sample: ETA refuses, next~ steps in
+    assert "red ~" not in out
+
+
+def test_handoff_cue_at_red(env):
+    out = run(payload_tokens("red", 180_000))
+    assert out.startswith("🔴 90% ctx")
+    assert "→ handoff?" in out
+
+
+def test_compaction_counter(env):
+    t0 = time.time() - 120
+    seed_state(env, "comp", {"samples": [[100_000, t0], [120_000, t0 + 60]]})
+    out = run(payload_tokens("comp", 60_000))
+    assert "↺1" in out
+
+
+def test_cost_segment_feature_detected(env):
+    out = run(payload_tokens("cost", 50_000, extra={"cost": {"total_cost_usd": 0.4234}}))
+    assert "$0.42" in out
+    out2 = run(payload_tokens("cost2", 50_000))
+    assert "$" not in out2
+
+
+def test_pre_07_int_samples_reset_not_crash(env):
+    seed_state(env, "old", {"samples": [90_000, 110_000, 130_000]})
+    out = run(payload_tokens("old", 140_000))
+    assert out.startswith("🟡 70% ctx")
+
+
 def test_big_transcript_incremental_tick_is_fast(env):
     big = env / "big.jsonl"
     lines = transcript_lines()

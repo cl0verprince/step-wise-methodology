@@ -27,7 +27,9 @@ and continue at the matching phase below. Never re-run scaffolding that
 already exists, and never re-open a step marked `done` unless the human asks.
 A missing file means that concern hasn't come up yet — supply it when its
 phase arrives (a missing `HANDOFF.md` just means no handoff happened), never
-by restarting.
+by restarting. **No state files at all in a non-empty repo?** The project
+predates the methodology — → `adopting-existing-projects` (survey it, then
+the human chooses ride / adopt / rebuild).
 
 **Phase 0 — Frame.** Before any file exists, settle *what* and *why*.
 → `superpowers:brainstorming` (required). Do not skip to planning until intent,

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0 — 2026-07-14
+- **New skill: `adopting-existing-projects`** — brings the methodology to
+  codebases that weren't built with it. Read-only survey first, then the
+  human chooses the depth: **Ride** (learn conventions into `CLAUDE.md`, no
+  restructuring), **Adopt** (state model mapped onto existing structures —
+  the project's Makefile *is* the conductor; history as forward-only
+  baseline / milestones / full reconstruction), or **Rebuild**
+  (double-confirmed re-engineering). Test-less projects get a
+  characterization safety net before any behavior change.
+  `stepwise-delivery` Phase R now routes here when a non-empty repo has no
+  state files.
+- **context-meter v2**: `red ~35m` time-to-red from the median burn rate
+  (timestamped samples; falls back to `next ~N%` until history suffices),
+  `→ handoff?` cue at/predicted red, session cost (`$0.42`,
+  feature-detected), compaction counter (`↺1`), median instead of mean for
+  growth. Pre-0.7 state files reset gracefully.
+
 ## 0.6.0 — 2026-07-13
 - **New `awaiting_approval` step status** (built, UAT green, stopped at the human
   gate) — added to `workflow.json`'s vocabulary, `render_docs.py` (purple),

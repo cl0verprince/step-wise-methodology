@@ -3,16 +3,19 @@
 Reads the status-line JSON on stdin (documented at
 https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
 
-    🟢 12% ctx (98k/1.0M) · next ~15% · 23 turns · 1h42m
+    🟡 71% ctx (142k/200k) · red ~35m · 23 turns · 1h42m · $0.42 ↺1
 
 - Traffic light 🟢/🟡/🔴 for how full the context window is right now.
 - Live token count and the true window size (200k or the extended 1M).
-- "next ~N%" — an estimate of where the window will be after the next turn,
-  from the moving average of recent per-turn growth. Honest, not precise: the
-  dominant unknown is how large the next tool result is, so it is shown as an
-  estimate and flagged ⚠ when the next turn is likely to cross the red line.
-- "N turns · 1h42m" — how many exchanges (real user prompts) this session has
-  had and how long it has been running, from the transcript JSONL.
+- "red ~35m" — estimated time until usage crosses the red line, from the
+  median growth rate of recent turns. Shown only once there is enough
+  history to be honest (else it falls back to "next ~N%", the estimated
+  usage after one more turn). "→ handoff?" appears when usage is at or
+  predicted to cross red — the cue to run the session-handoff skill.
+- "23 turns · 1h42m" — exchanges (real user prompts) and session runtime,
+  from the transcript JSONL.
+- "$0.42" — session cost, when the payload carries a cost block.
+- "↺1" — how many context compactions have been detected this session.
 
 Token math comes from the stdin JSON alone. The transcript is read
 INCREMENTALLY: a byte offset is kept per session, so each status-line tick
@@ -21,10 +24,10 @@ the first time a session is seen. Turns are counted by cheap substring checks
 (no per-line JSON parsing): a turn is a user-typed prompt, not a tool result
 flowing back and not a meta entry.
 
-Cross-invocation memory (prediction samples, transcript offset/tally) lives in
-a tiny bounded state file per session in a temp dir. Every side effect is
-guarded: a status line must NEVER crash or hang, so on any error this prints a
-neutral fallback and exits 0. No network, ever.
+Cross-invocation memory (timestamped samples, transcript offset/tally,
+compaction count) lives in a tiny bounded state file per session in a temp
+dir. Every side effect is guarded: a status line must NEVER crash or hang, so
+on any error this prints a neutral fallback and exits 0. No network, ever.
 
 Usage (wire into settings.json, see the skill's SKILL.md):
     "statusLine": { "type": "command",
@@ -34,15 +37,18 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 # Traffic light thresholds, as a percentage of the context window used.
 # RED is set below Claude Code's auto-compaction point to give real runway.
 GREEN_BELOW = 60      # < 60%  -> 🟢
-YELLOW_BELOW = 85     # 60–85% -> 🟡 ; >= 85% -> 🔴
+YELLOW_BELOW = 85     # 60–85% -> 🟡 ; >= 85% -> 🔴 (also the handoff cue line)
 
-MAX_SAMPLES = 12      # rolling history kept per session for the prediction
+MAX_SAMPLES = 12      # rolling history kept per session for the estimates
+MIN_ETA_GROWTHS = 3   # growth samples needed before "red ~Xm" is honest
+MIN_ETA_SPAN = 60.0   # seconds of history needed before a rate means anything
 
 
 def _fmt_tokens(n: int) -> str:
@@ -70,6 +76,12 @@ def _light(pct: float) -> str:
     if pct < YELLOW_BELOW:
         return "🟡"
     return "🔴"
+
+
+def _median(values: list) -> float:
+    vs = sorted(values)
+    mid = len(vs) // 2
+    return float(vs[mid]) if len(vs) % 2 else (vs[mid - 1] + vs[mid]) / 2
 
 
 def _state_path(session_id: str) -> Path:
@@ -102,33 +114,60 @@ def _save_state(path: Path, state: dict) -> None:
         pass
 
 
-def _append_sample(state: dict, used_tokens: int) -> list:
-    """Record used_tokens if it changed (a real turn), return recent samples.
+def _append_sample(state: dict, used_tokens: int, now: float) -> list:
+    """Record [tokens, timestamp] if tokens changed (a real turn).
 
     Status lines re-run on a timer too; those idle re-runs must not skew the
-    per-turn growth deltas, so unchanged readings are not appended.
+    growth estimates, so unchanged readings are not appended. A drop in the
+    total is a compaction — counted, then sampled like any other point (the
+    negative delta is filtered out of the growth math downstream).
+    Pre-0.7 state files held bare ints; those are reset, not migrated.
     """
     samples = state.get("samples")
-    if not isinstance(samples, list):
+    if not isinstance(samples, list) or any(
+        not (isinstance(s, list) and len(s) == 2) for s in samples
+    ):
         samples = []
-    if not samples or samples[-1] != used_tokens:
-        samples.append(used_tokens)
+    if samples and used_tokens < samples[-1][0]:
+        state["compactions"] = state.get("compactions", 0) + 1
+    if not samples or samples[-1][0] != used_tokens:
+        samples.append([used_tokens, now])
     state["samples"] = samples[-MAX_SAMPLES:]
     return state["samples"]
 
 
-def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
-    """Estimate next-turn used tokens from the mean of recent positive deltas.
+def _growths(samples: list) -> list:
+    """Positive per-turn token deltas (compaction drops filtered out)."""
+    return [b - a for (a, _), (b, _) in zip(samples, samples[1:]) if b > a]
 
-    Compaction drops the total; those negative deltas are ignored so a recent
-    compaction doesn't make the meter predict shrinkage. Returns None when there
-    isn't enough history to say anything honest.
-    """
-    growths = [b - a for a, b in zip(samples, samples[1:]) if b > a]
+
+def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
+    """Median-growth estimate of next-turn usage (robust to one huge turn)."""
+    growths = _growths(samples)
     if not growths:
         return None
-    avg_growth = sum(growths) / len(growths)
-    return min(used_tokens + round(avg_growth), window)
+    return min(used_tokens + round(_median(growths)), window)
+
+
+def _red_eta(samples: list, used_tokens: int, window: int) -> float | None:
+    """Seconds until usage crosses the red line, from the observed burn rate.
+
+    Only answers when the history can carry the claim: enough growth samples,
+    over a long-enough wall-clock span, with red still ahead.
+    """
+    growths = _growths(samples)
+    if len(growths) < MIN_ETA_GROWTHS:
+        return None
+    span = samples[-1][1] - samples[0][1]
+    if span < MIN_ETA_SPAN:
+        return None
+    tokens_to_red = window * YELLOW_BELOW / 100 - used_tokens
+    if tokens_to_red <= 0:
+        return None
+    rate = sum(growths) / span            # tokens per second, net of compactions
+    if rate <= 0:
+        return None
+    return tokens_to_red / rate
 
 
 def _tally_transcript(state: dict, transcript_path: str) -> None:
@@ -228,8 +267,9 @@ def render(data: dict) -> str:
     state_file = _state_path(session_id) if session_id else None
     state = _load_state(state_file) if state_file else {}
 
-    samples = _append_sample(state, used_tokens)
+    samples = _append_sample(state, used_tokens, time.time())
     predicted = _predict_next(samples, used_tokens, window)
+    eta = _red_eta(samples, used_tokens, window)
     try:
         _tally_transcript(state, data.get("transcript_path") or "")
     except Exception:
@@ -242,11 +282,29 @@ def render(data: dict) -> str:
         f"{_light(used_pct)} {round(used_pct)}% ctx "
         f"({_fmt_tokens(used_tokens)}/{_fmt_tokens(window)})"
     )
-    if predicted is not None:
-        pred_pct = predicted / window * 100
-        warn = " ⚠" if pred_pct >= YELLOW_BELOW > used_pct else ""
-        line += f" · next ~{round(pred_pct)}%{warn}"
-    return line + _session_suffix(state)
+    # Trajectory: the time-to-red ETA when history can carry it, else the
+    # one-turn-ahead estimate. One of them, never both — the line is a glance.
+    if eta is not None:
+        line += f" · red ~{_fmt_duration(eta)}"
+    elif predicted is not None:
+        line += f" · next ~{round(predicted / window * 100)}%"
+
+    # The cue the methodology promises: at (or predicted to cross) red,
+    # point at the session-handoff skill.
+    pred_pct = predicted / window * 100 if predicted is not None else 0
+    if used_pct >= YELLOW_BELOW or pred_pct >= YELLOW_BELOW:
+        line += " → handoff?"
+
+    line += _session_suffix(state)
+
+    cost = (data.get("cost") or {}).get("total_cost_usd")
+    if isinstance(cost, (int, float)) and cost > 0:
+        line += f" · ${cost:.2f}"
+
+    compactions = state.get("compactions", 0)
+    if compactions:
+        line += f" ↺{compactions}"
+    return line
 
 
 def _emit(text: str) -> None:

@@ -18,6 +18,7 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | Skill | Use it when |
 |---|---|
 | `stepwise-delivery` *(orchestrator)* | starting a new project or major feature — drives the whole phased, gated workflow |
+| `adopting-existing-projects` | bringing the methodology to a codebase that wasn't built with it — survey first, then the human picks ride / adopt / rebuild |
 | `authoring-the-master-plan` | writing the master `plan.md` (Goal / Required Output / ordered steps) |
 | `deterministic-conductors` | building the reproducible run-the-pipeline entry point (any language) |
 | `browser-readable-project-docs` | keeping an offline, double-clickable decision log + flow diagram |
@@ -25,7 +26,7 @@ Language-agnostic. Efficient by design (skills load only when their concern is a
 | `craftsmanship-bar` | holding code to clean, reviewable, no-slop, matches-the-docs standards |
 | `agentic-step-execution` | using subagents / parallel workflows to build a step |
 | `pipeline-architect` | connecting the repo to GitHub (init → push → branch protection) and deriving the right CI gates from `plan.md` + the pipeline maturity ladder, in approval-gated stages |
-| `context-meter` | showing context usage, turn count, and session duration as a traffic light in the Claude Code status line |
+| `context-meter` | showing context usage, time-to-red, turns, duration, and cost as a traffic light in the Claude Code status line |
 | `session-handoff` | context is running high — write a tight `HANDOFF.md` to resume in a fresh session |
 
 ## Project state model
