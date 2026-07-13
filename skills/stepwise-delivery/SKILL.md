@@ -31,8 +31,10 @@ concrete `# Required Output`, then the ordered `# Steps`.
 → `deterministic-conductors` (the reproducible entry-point skeleton),
 → `browser-readable-project-docs` (copy `render_docs.py`, seed `decisions.json` /
 `workflow.json`),
-→ `pipeline-architect` (derive the CI/CD pipeline from `plan.md`'s Required
-Output and run the gates in CI — deploy/release stays behind the human gate).
+→ `pipeline-architect` (connect the repo to GitHub if it isn't — init, first
+push, branch protection — then derive the CI gates from `plan.md`'s Required
+Output and the maturity ladder, in staged, per-stage-approved setup; record
+the level in `pipeline.md`; deploy/release stays behind the human gate).
 
 **Phase 3 — The step loop.** For each numbered step, in order:
 1. Write the step's `stepN_name/design.md` (traces to the Required Output).

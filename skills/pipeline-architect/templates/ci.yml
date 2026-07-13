@@ -1,11 +1,15 @@
-# Universal CI baseline + release-on-tag archetype (GitHub Actions).
+# Gate ladder + release-on-tag archetype (GitHub Actions).
 #
 # Drop into a project's .github/workflows/. This is the REFERENCE pipeline for a
-# library / CLI / plugin: it runs the methodology's gates on every push/PR
-# (secret scan, deterministic conductor, UAT/SIT) and cuts a GitHub Release when
-# a vX.Y.Z tag is pushed. For a service, frontend, or data-science project,
-# keep the `gates` job and swap the `release` job for that archetype's delivery
-# (see pipeline-architect SKILL.md). Steps assume Python; adapt to your language.
+# library / CLI / plugin: the `gates` job runs the methodology's gates on every
+# push/PR and the `release` job cuts a GitHub Release when a vX.Y.Z tag is
+# pushed. For a service, frontend, or data-science project, keep `gates` and
+# swap `release` for that archetype's delivery (see pipeline-architect SKILL.md).
+#
+# Gates are marked [L0]-[L3] — the project's maturity ladder (recorded in the
+# project's pipeline.md). L2/L3 steps ship commented out: uncomment each when
+# you reach that level. Steps assume Python (pytest/ruff/mypy); swap per
+# language — vitest/eslint/prettier/tsc, cargo test/clippy, etc.
 
 name: ci
 
@@ -21,14 +25,15 @@ permissions:
 
 jobs:
   gates:
-    # The universal baseline — the automated backstop for the manual gates.
+    # The automated backstop for the manual gates. Branch protection requires
+    # this job (check name: "gates") to be green before merging to main.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0        # full history so the secret scan sees every commit
 
-      # Gate 1 — secret scan (backstop for secret-safe-commits).
+      # [L0] Secret scan (backstop for secret-safe-commits).
       # gitleaks-action is free for personal/public repos; orgs need a license.
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
@@ -43,14 +48,43 @@ jobs:
         run: pip install -r requirements.txt
         # No requirements.txt yet? Replace with your project's install step.
 
-      # Gate 2 — reproducibility: the general conductor must run clean.
+      # [L0] Unit tests — the fast red/green suite from TDD, distinct from
+      # UAT/SIT. No tests/unit yet? Point this at your fast suite.
+      - name: Unit tests
+        run: pytest tests/unit -q
+
+      # [L1] Reproducibility: the general conductor must run clean.
       - name: Reproduce (conductor)
         run: python conductor.py
         # Adapt to your conductor's entry point (Makefile, conductor.mjs, …).
 
-      # Gate 3 — the tests that back every step's UAT and the SIT.
+      # [L1] The tests that back every step's UAT and the SIT.
+      # No tests/sit yet? Drop that path until the SIT exists (pytest errors
+      # on missing paths) — and add it back when Phase 4 arrives.
       - name: UAT / SIT
-        run: pytest tests/
+        run: pytest tests/uat tests/sit
+
+      # [L2] Lint + format check (backstop for craftsmanship-bar).
+      # Uncomment when you reach L2 (see pipeline.md).
+      # - name: Lint + format
+      #   run: |
+      #     ruff check .
+      #     ruff format --check .
+
+      # [L2] Coverage, advisory — reported, never blocks.
+      # Uncomment when you reach L2 (see pipeline.md).
+      # - name: Coverage (advisory)
+      #   continue-on-error: true
+      #   run: pytest tests/unit --cov=. --cov-report=term
+
+      # [L3] Type check. Uncomment when you reach L3 (see pipeline.md).
+      # - name: Type check
+      #   run: mypy .
+
+      # [L3] Coverage floor — REPLACES the L2 advisory step above.
+      # Keep the number in sync with pipeline.md; the floor only rises.
+      # - name: Coverage (floor)
+      #   run: pytest tests/unit --cov=. --cov-report=term --cov-fail-under=60
 
   release:
     # Release-on-tag archetype. Runs ONLY for vX.Y.Z tags, and only after the
