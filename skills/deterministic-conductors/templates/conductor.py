@@ -33,7 +33,7 @@ def build_pipeline():
 
 
 def main() -> None:
-    seed_everything(CONFIG["seed"])
+    seed_everything(CONFIG.get("seed", 0))
     steps = build_pipeline()
     for label, run in tqdm(steps, desc="pipeline", unit="step"):
         run()

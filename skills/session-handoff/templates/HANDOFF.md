@@ -1,7 +1,7 @@
 # Handoff — <YYYY-MM-DD>
 
 **Goal:** <one line — see `plan.md`; restate fully only if there is no plan.md>
-**Current step:** <stepN_name> — <done | in_progress | blocked>
+**Current step:** <stepN_name> — <done | in_progress | awaiting_approval | pending> (must match `workflow.json`; a blocker goes under Open threads)
 
 ## Last 4 turns
 <the volatile working memory a fresh session lacks — what changed and WHY>

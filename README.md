@@ -35,7 +35,7 @@ A step-wise project's durable state is four small root files, each owning exactl
 | File | Owns | Maintained via |
 |---|---|---|
 | `plan.md` | the **contract** — goal, required output, ordered steps (never status) | `authoring-the-master-plan` |
-| `workflow.json` | the **canonical step status** — `done` / `in_progress` / `pending` | every skill that starts, finishes, or adds a step |
+| `workflow.json` | the **canonical step status** — `done` / `in_progress` / `awaiting_approval` / `pending` | every skill that starts, finishes, or adds a step |
 | `pipeline.md` | the **delivery posture** — archetype, CI maturity level, active gates | `pipeline-architect` |
 | `HANDOFF.md` | the **volatile last-session memory**, pointing at the rest | `session-handoff` |
 

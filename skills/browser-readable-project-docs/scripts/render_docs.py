@@ -15,7 +15,7 @@ Usage:
 
 decisions.json:  [{"date": "2026-07-07", "decision": "...", "rationale": "..."}]
 workflow.json :  {"steps": [{"name": "step0_setup", "status": "done"}, ...]}
-                 status is one of: done | in_progress | pending
+                 status: done | in_progress | awaiting_approval | pending
 """
 import argparse
 import html
@@ -26,6 +26,7 @@ from pathlib import Path
 STATUS_COLORS = {
     "done": ("#1a7f37", "#0f5323"),
     "in_progress": ("#9a6700", "#7a5200"),
+    "awaiting_approval": ("#8250df", "#6639ba"),  # built + UAT green, at the gate
     "pending": ("#57606a", "#424a53"),
 }
 

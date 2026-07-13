@@ -21,7 +21,9 @@ Two offline, self-contained HTML pages let a human **double-click and read** the
    {"steps": [{"name": "step0_setup", "status": "done"},
               {"name": "step1_cli",   "status": "in_progress"}]}
    ```
-   `status` is `done` | `in_progress` | `pending`. Convert relative dates ("today") to absolute.
+   `status` is `done` | `in_progress` | `awaiting_approval` | `pending`
+   (`awaiting_approval` = built, UAT green, stopped at the human gate).
+   Convert relative dates ("today") to absolute.
 
    `workflow.json` is the project's **canonical step status** — the one
    answer to "where are we?". Other skills (`stepwise-delivery`,

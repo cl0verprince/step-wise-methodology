@@ -143,10 +143,14 @@ merge into `main`:
 
 ```
 gh api -X PUT repos/{owner}/{repo}/branches/main/protection \
-  -f 'required_status_checks[strict]=true' -f 'required_status_checks[contexts][]=gates' \
-  -f 'enforce_admins=false' -f 'required_pull_request_reviews[required_approving_review_count]=0' \
+  -F 'required_status_checks[strict]=true' -f 'required_status_checks[contexts][]=gates' \
+  -F 'enforce_admins=false' -F 'required_pull_request_reviews[required_approving_review_count]=0' \
   -F 'restrictions=null'
 ```
+
+(`-F`, not `-f`, for the booleans/integers/null — `-f` sends strings and the
+protection endpoint rejects `"true"`/`"0"` with HTTP 422; only the check-name
+in `contexts[]` is a real string.)
 
 Two known snags — tell the user, don't silently work around:
 - The `gates` context can be required **before it has ever run** (the API takes

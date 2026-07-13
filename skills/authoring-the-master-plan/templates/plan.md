@@ -11,7 +11,7 @@
 - **Out of scope:** <what this explicitly does NOT deliver>
 
 # Steps
-1. step0_setup — <scaffold: .gitignore, .env(.example), config, docs, conductor skeleton>
+1. step0_setup — <scaffold: .gitignore, .env(.example), config, docs, conductor skeleton, CI pipeline (pipeline.md)>
 2. step1_<name> — <one deliverable slice> → step1_<name>/design.md
 3. step2_<name> — <…> → step2_<name>/design.md
 4. …

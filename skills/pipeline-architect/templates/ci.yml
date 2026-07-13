@@ -20,13 +20,13 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write        # release job needs this to create the GitHub Release
-
 jobs:
   gates:
     # The automated backstop for the manual gates. Branch protection requires
     # this job (check name: "gates") to be green before merging to main.
+    # Least privilege: this job runs project code, so it only reads.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +91,8 @@ jobs:
     # gates pass. The human minted the tag; CI just packages and publishes.
     needs: gates
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write    # only the release job may write (create the Release)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

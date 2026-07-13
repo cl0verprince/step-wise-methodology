@@ -49,8 +49,9 @@ the level in `pipeline.md`; deploy/release stays behind the human gate).
 
 **Phase 3 — The step loop.** For each numbered step, in order. `workflow.json`
 is the **canonical step status**: mark the step `in_progress` when it starts,
-and `done` only when the human clears its gate — `plan.md` stays the contract
-and never carries progress markers.
+`awaiting_approval` when you stop at its gate (built, UAT reported), and
+`done` only when the human clears the gate — `plan.md` stays the contract and
+never carries progress markers.
 1. Write the step's `stepN_name/design.md` (traces to the Required Output).
 2. Build the slice — solo, or via `agentic-step-execution` when independent
    slices fan out. Implement test-first (`superpowers:test-driven-development`).
@@ -87,10 +88,11 @@ result per criterion, what the next step is. **Only the human advances to the
 next step.** A subagent, a passing UAT, or your own confidence never clears the
 gate. This is the single invariant every other skill defers to.
 
-When the human clears the gate, flip the step to `done` in `workflow.json`
-(and the next step to `in_progress` as it starts) in a small status commit at
-the top of the next step's work — the build commits themselves stay one per
-gated step.
+Stopping at the gate sets the step to `awaiting_approval` in `workflow.json`
+(inside the step's own commit — item 5). When the human clears the gate, flip
+it to `done` (and the next step to `in_progress` as it starts) in a small
+status commit at the top of the next step's work — the build commits
+themselves stay one per gated step.
 
 ## Red flags — STOP
 - Re-scaffolding (Phase 0–2) a project whose `plan.md` / conductor already exist — re-enter via Phase R instead

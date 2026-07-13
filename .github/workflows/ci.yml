@@ -1,0 +1,36 @@
+# CI for the plugin repo itself — dogfoods the methodology's own gates:
+# secret scan, then the structural/behavioral test suite (manifests,
+# frontmatter, templates, bundled scripts).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gates:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history so the secret scan sees every commit
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install
+        run: pip install pytest pyyaml
+
+      - name: Tests
+        run: pytest tests/ -q

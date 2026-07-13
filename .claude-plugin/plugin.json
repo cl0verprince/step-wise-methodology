@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "step-wise-methodology",
   "displayName": "Step-Wise Methodology",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Build any new project or major feature in deliberate, planned, acceptance-tested, approval-gated numbered steps. Language-agnostic. Readable, reviewable output whose code stays in sync with its docs.",
   "author": {
     "name": "cl0verprince",
@@ -19,6 +19,10 @@
     "step-wise",
     "acceptance-testing",
     "determinism",
-    "secret-safety"
+    "secret-safety",
+    "ci-cd",
+    "github",
+    "pipeline",
+    "testing"
   ]
 }
