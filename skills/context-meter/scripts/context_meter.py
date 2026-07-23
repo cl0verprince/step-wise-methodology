@@ -90,6 +90,39 @@ def _short_model(data: dict) -> str | None:
     return low.split()[0][:12]
 
 
+def _project_root(start: str) -> Path | None:
+    """Nearest ancestor (including start) containing .git or workflow.json."""
+    if not start:
+        return None
+    try:
+        p = Path(start).resolve()
+        for candidate in (p, *p.parents):
+            if (candidate / ".git").exists() or (candidate / "workflow.json").is_file():
+                return candidate
+    except OSError:
+        pass
+    return None
+
+
+def _git_branch(root: Path) -> str | None:
+    """Current branch from .git/HEAD — no git subprocess (status lines must be
+    fast). Worktrees ('.git' is a file with 'gitdir: <path>') and detached
+    HEAD (short SHA) are handled; anything unreadable just drops the segment."""
+    try:
+        git = root / ".git"
+        if git.is_file():
+            target = git.read_text(encoding="utf-8", errors="replace").strip()
+            if not target.startswith("gitdir:"):
+                return None
+            git = (root / target[len("gitdir:"):].strip()).resolve()
+        head = (git / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if head.startswith("ref: "):
+        return head.rsplit("/", 1)[-1] or None
+    return head[:7] or None
+
+
 def _median(values: list) -> float:
     vs = sorted(values)
     mid = len(vs) // 2
@@ -287,6 +320,11 @@ def render(data: dict) -> str:
     except Exception:
         pass                                  # tally is a bonus, never a risk
 
+    root = _project_root(
+        (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
+    )
+    branch = _git_branch(root) if root else None
+
     if state_file:
         _save_state(state_file, state)
 
@@ -310,6 +348,9 @@ def render(data: dict) -> str:
     model = _short_model(data)
     if model:
         line += f" · {model}"
+
+    if branch:
+        line += f" · {branch}"
 
     line += _session_suffix(state)
 

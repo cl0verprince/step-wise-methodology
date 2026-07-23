@@ -227,3 +227,45 @@ def test_model_segment_unknown_family(env):
 def test_model_absent_no_segment(env):
     # No model, transcript, or cost: the line is exactly the gauge.
     assert run(payload_tokens("model3", 98_000)) == "🟢 49% (98k/200k)"
+
+
+def branch_payload(session, project_dir, inp=98_000):
+    return payload_tokens(session, inp, extra={
+        "workspace": {"current_dir": str(project_dir)},
+    })
+
+
+def test_branch_segment(env, tmp_path):
+    proj = tmp_path / "proj"
+    (proj / ".git").mkdir(parents=True)
+    (proj / ".git" / "HEAD").write_text("ref: refs/heads/feature-x\n", encoding="utf-8")
+    sub = proj / "src"
+    sub.mkdir()
+    out = run(branch_payload("br1", sub))     # found by walking up from src/
+    assert "· feature-x" in out
+
+
+def test_branch_worktree_gitdir_file(env, tmp_path):
+    real = tmp_path / "repo" / ".git" / "worktrees" / "wt"
+    real.mkdir(parents=True)
+    (real / "HEAD").write_text("ref: refs/heads/wt-branch\n", encoding="utf-8")
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    (wt / ".git").write_text(f"gitdir: {real}\n", encoding="utf-8")
+    out = run(branch_payload("br2", wt))
+    assert "· wt-branch" in out
+
+
+def test_branch_detached_head(env, tmp_path):
+    proj = tmp_path / "det"
+    (proj / ".git").mkdir(parents=True)
+    (proj / ".git" / "HEAD").write_text("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n", encoding="utf-8")
+    out = run(branch_payload("br3", proj))
+    assert "· a1b2c3d" in out
+
+
+def test_no_git_no_branch_segment(env, tmp_path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    out = run(branch_payload("br4", plain))
+    assert "feature" not in out and "· a1b2c3d" not in out
