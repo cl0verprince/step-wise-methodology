@@ -152,7 +152,7 @@ def _step_segment(root: Path, state: dict) -> str | None:
                     total,
                 )
             seg = f"step {current}/{total}"
-    except (OSError, ValueError):
+    except (OSError, ValueError, TypeError, AttributeError):
         seg = None
     state["workflow"] = {"path": str(wf), "mtime": mtime, "seg": seg}
     return seg

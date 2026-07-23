@@ -321,3 +321,17 @@ def test_broken_workflow_never_crashes(env, tmp_path):
     (proj / "workflow.json").write_text("{not json", encoding="utf-8")
     out = run(branch_payload("st5", proj))
     assert out.startswith("🟢") and "step " not in out
+
+
+def test_non_object_workflow_never_crashes(env, tmp_path):
+    proj = project_with_git(tmp_path, "p6")
+    (proj / "workflow.json").write_text("[1, 2, 3]", encoding="utf-8")
+    out = run(branch_payload("st6", proj))
+    assert out.startswith("🟢") and "step " not in out
+
+
+def test_non_list_steps_never_crashes(env, tmp_path):
+    proj = project_with_git(tmp_path, "p7")
+    (proj / "workflow.json").write_text('{"steps": true}', encoding="utf-8")
+    out = run(branch_payload("st7", proj))
+    assert out.startswith("🟢") and "step " not in out
