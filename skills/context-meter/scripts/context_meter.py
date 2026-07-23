@@ -49,6 +49,7 @@ YELLOW_BELOW = 85     # 60–85% -> 🟡 ; >= 85% -> 🔴 (also the handoff cue 
 MAX_SAMPLES = 12      # rolling history kept per session for the estimates
 MIN_ETA_GROWTHS = 3   # growth samples needed before "red ~Xm" is honest
 MIN_ETA_SPAN = 60.0   # seconds of history needed before a rate means anything
+BURN_MIN_AGE = 600.0  # seconds of session age before $/h is meaningful
 
 
 def _fmt_tokens(n: int) -> str:
@@ -302,23 +303,30 @@ def _tally_transcript(state: dict, transcript_path: str) -> None:
     state["transcript"] = t
 
 
+def _session_elapsed(state: dict) -> float | None:
+    """Seconds since the transcript's first timestamp, or None."""
+    start = (state.get("transcript") or {}).get("start")
+    if not start:
+        return None
+    try:
+        begun = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if begun.tzinfo is None:
+        begun = begun.replace(tzinfo=timezone.utc)
+    elapsed = (datetime.now(timezone.utc) - begun).total_seconds()
+    return elapsed if elapsed >= 0 else None
+
+
 def _session_suffix(state: dict) -> str:
     """' · 23 turns · 1h42m' from the tallied transcript state, or ''."""
     t = state.get("transcript") or {}
     parts = []
     if t.get("turns"):
         parts.append(f"{t['turns']} turn{'s' if t['turns'] != 1 else ''}")
-    start = t.get("start")
-    if start:
-        try:
-            begun = datetime.fromisoformat(start.replace("Z", "+00:00"))
-            if begun.tzinfo is None:
-                begun = begun.replace(tzinfo=timezone.utc)
-            elapsed = (datetime.now(timezone.utc) - begun).total_seconds()
-            if elapsed >= 0:
-                parts.append(_fmt_duration(elapsed))
-        except ValueError:
-            pass
+    elapsed = _session_elapsed(state)
+    if elapsed is not None:
+        parts.append(_fmt_duration(elapsed))
     return ("".join(f" · {p}" for p in parts)) if parts else ""
 
 
@@ -396,6 +404,9 @@ def render(data: dict) -> str:
     cost = (data.get("cost") or {}).get("total_cost_usd")
     if isinstance(cost, (int, float)) and cost > 0:
         line += f" · ${cost:.2f}"
+        elapsed = _session_elapsed(state)
+        if elapsed and elapsed >= BURN_MIN_AGE:
+            line += f" · ${cost / (elapsed / 3600):.2f}/h"
 
     compactions = state.get("compactions", 0)
     if compactions:

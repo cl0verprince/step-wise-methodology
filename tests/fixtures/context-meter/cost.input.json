@@ -1,0 +1,9 @@
+{
+  "session_id": "fx-cost",
+  "context_window": {
+    "context_window_size": 200000,
+    "total_input_tokens": 90000,
+    "total_output_tokens": 8000
+  },
+  "cost": {"total_cost_usd": 0.42}
+}

@@ -335,3 +335,29 @@ def test_non_list_steps_never_crashes(env, tmp_path):
     (proj / "workflow.json").write_text('{"steps": true}', encoding="utf-8")
     out = run(branch_payload("st7", proj))
     assert out.startswith("🟢") and "step " not in out
+
+
+def test_burn_rate_shown_after_ten_minutes(env):
+    t = env / "t.jsonl"
+    t.write_text("\n".join(transcript_lines()) + "\n", encoding="utf-8")
+    p = payload_for(t)                          # transcript starts ~1h42m ago
+    p["cost"] = {"total_cost_usd": 0.42}
+    out = run(p)
+    assert "· $0.42" in out
+    assert "· $0.25/h" in out                   # 0.42 / 1.7h
+
+
+def test_burn_rate_hidden_early(env):
+    t = env / "young.jsonl"
+    recent = (datetime.now(timezone.utc) - timedelta(minutes=5)).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z"
+    )
+    t.write_text(
+        jline(type="user", timestamp=recent, message={"role": "user", "content": "hi"})
+        + "\n",
+        encoding="utf-8",
+    )
+    p = payload_for(t, session="young")
+    p["cost"] = {"total_cost_usd": 0.10}
+    out = run(p)
+    assert "$0.10" in out and "/h" not in out
