@@ -1,0 +1,8 @@
+{
+  "session_id": "fx-red",
+  "context_window": {
+    "context_window_size": 200000,
+    "total_input_tokens": 172000,
+    "total_output_tokens": 8000
+  }
+}
