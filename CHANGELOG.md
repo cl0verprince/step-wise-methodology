@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### context-meter v3
+- Dashboard segments: model, git branch (from `.git/HEAD`, worktree-aware),
+  current step from `workflow.json`, and cost burn rate (`$/h`).
+- `CLAUDE_CONTEXT_METER_HIDE` opt-out for individual segments.
+- Idle-aware time-to-red (gaps capped at 10 min), recency-weighted next-turn
+  estimate, and a red line learned from observed compactions.
+- Agent-led setup: interpreter auto-detection (`python`/`python3`/`py`),
+  settings written for you, verified against `scripts/sample.json`.
+- Golden-fixture regression suite pinning exact output lines.
+
 ## 0.7.0 — 2026-07-14
 - **New skill: `adopting-existing-projects`** — brings the methodology to
   codebases that weren't built with it. Read-only survey first, then the
