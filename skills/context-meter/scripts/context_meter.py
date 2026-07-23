@@ -46,6 +46,10 @@ from pathlib import Path
 GREEN_BELOW = 60      # < 60%  -> 🟢
 YELLOW_BELOW = 85     # 60–85% -> 🟡 ; >= 85% -> 🔴 (also the handoff cue line)
 
+# Learned red line: compactions are observed when token usage drops.
+RED_MARGIN = 5.0      # stay this many points under an observed compaction
+RED_FLOOR = 50.0      # never learn a red line below this
+
 MAX_SAMPLES = 12      # rolling history kept per session for the estimates
 MIN_ETA_GROWTHS = 3   # growth samples needed before "red ~Xm" is honest
 MIN_ETA_SPAN = 60.0   # seconds of history needed before a rate means anything
@@ -72,12 +76,25 @@ def _fmt_duration(seconds: float) -> str:
     return f"{minutes // 60}h{minutes % 60:02d}m"
 
 
-def _light(pct: float) -> str:
-    if pct < GREEN_BELOW:
-        return "🟢"
-    if pct < YELLOW_BELOW:
+def _light(pct: float, red_pct: float) -> str:
+    if pct >= red_pct:
+        return "🔴"
+    if pct >= GREEN_BELOW:
         return "🟡"
-    return "🔴"
+    return "🟢"
+
+
+def _red_pct(state: dict) -> float:
+    """The effective red line: the configured constant, pulled down toward the
+    lowest usage %% at which this machine actually compacted (minus a margin).
+    Observed truth beats the guessed constant."""
+    pcts = [
+        p for p in (state.get("compaction_pcts") or [])
+        if isinstance(p, (int, float))
+    ]
+    if not pcts:
+        return float(YELLOW_BELOW)
+    return max(RED_FLOOR, min(float(YELLOW_BELOW), min(pcts) - RED_MARGIN))
 
 
 def _hidden() -> set:
@@ -210,7 +227,7 @@ def _save_state(path: Path, state: dict) -> None:
         pass
 
 
-def _append_sample(state: dict, used_tokens: int, now: float) -> list:
+def _append_sample(state: dict, used_tokens: int, now: float, window: int | None) -> list:
     """Record [tokens, timestamp] if tokens changed (a real turn).
 
     Status lines re-run on a timer too; those idle re-runs must not skew the
@@ -226,6 +243,10 @@ def _append_sample(state: dict, used_tokens: int, now: float) -> list:
         samples = []
     if samples and used_tokens < samples[-1][0]:
         state["compactions"] = state.get("compactions", 0) + 1
+        if window:
+            pcts = state.get("compaction_pcts") or []
+            pcts.append(round(samples[-1][0] / window * 100, 1))
+            state["compaction_pcts"] = pcts[-5:]
     if not samples or samples[-1][0] != used_tokens:
         samples.append([used_tokens, now])
     state["samples"] = samples[-MAX_SAMPLES:]
@@ -245,7 +266,7 @@ def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
     return min(used_tokens + round(_wmedian(growths)), window)
 
 
-def _red_eta(samples: list, used_tokens: int, window: int) -> float | None:
+def _red_eta(samples: list, used_tokens: int, window: int, red_pct: float) -> float | None:
     """Seconds until usage crosses the red line, from the observed burn rate.
 
     Idle-aware: each gap between samples contributes at most IDLE_GAP seconds
@@ -262,7 +283,7 @@ def _red_eta(samples: list, used_tokens: int, window: int) -> float | None:
             growth_count += 1
     if growth_count < MIN_ETA_GROWTHS or span_eff < MIN_ETA_SPAN:
         return None
-    tokens_to_red = window * YELLOW_BELOW / 100 - used_tokens
+    tokens_to_red = window * red_pct / 100 - used_tokens
     if tokens_to_red <= 0 or growth_total <= 0:
         return None
     return tokens_to_red / (growth_total / span_eff)
@@ -375,9 +396,10 @@ def render(data: dict) -> str:
 
     hide = _hidden()
 
-    samples = _append_sample(state, used_tokens, time.time())
+    samples = _append_sample(state, used_tokens, time.time(), window)
+    red = _red_pct(state)
     predicted = _predict_next(samples, used_tokens, window)
-    eta = _red_eta(samples, used_tokens, window)
+    eta = _red_eta(samples, used_tokens, window, red)
     try:
         _tally_transcript(state, data.get("transcript_path") or "")
     except Exception:
@@ -393,7 +415,7 @@ def render(data: dict) -> str:
         _save_state(state_file, state)
 
     line = (
-        f"{_light(used_pct)} {round(used_pct)}% "
+        f"{_light(used_pct, red)} {round(used_pct)}% "
         f"({_fmt_tokens(used_tokens)}/{_fmt_tokens(window)})"
     )
     # Trajectory: the time-to-red ETA when history can carry it, else the
@@ -406,7 +428,7 @@ def render(data: dict) -> str:
     # The cue the methodology promises: at (or predicted to cross) red,
     # point at the session-handoff skill.
     pred_pct = predicted / window * 100 if predicted is not None else 0
-    if used_pct >= YELLOW_BELOW or pred_pct >= YELLOW_BELOW:
+    if used_pct >= red or pred_pct >= red:
         line += " → handoff?"
 
     model = _short_model(data)

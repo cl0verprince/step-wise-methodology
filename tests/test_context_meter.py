@@ -422,3 +422,24 @@ def test_next_estimate_weights_recent_turns(env):
     # plain median of [9k,9k,1k,1k] = 5k -> next ~62%; recency-weighted
     # median = 1k -> next ~60%. Span < MIN_ETA_SPAN so next~ (not red~) shows.
     assert "next ~60%" in out
+
+
+def test_compaction_records_observed_pct(env):
+    t0 = time.time() - 120
+    seed_state(env, "learn", {"samples": [[100_000, t0], [150_000, t0 + 60]]})
+    run(payload_tokens("learn", 60_000))          # drop => compaction at 75%
+    state = json.loads((env / "state" / "learn.json").read_text(encoding="utf-8"))
+    assert state["compaction_pcts"] == [75.0]
+
+
+def test_learned_red_line_lowers_threshold(env):
+    seed_state(env, "learned", {"compaction_pcts": [72.0]})
+    out = run(payload_tokens("learned", 136_000))  # 68% >= learned red (67%)
+    assert out.startswith("🔴 68% (")
+    assert "→ handoff?" in out
+
+
+def test_default_red_line_without_observations(env):
+    out = run(payload_tokens("plain84", 168_000))  # 84% < default red 85%
+    assert out.startswith("🟡 84% (")
+    assert "handoff" not in out
