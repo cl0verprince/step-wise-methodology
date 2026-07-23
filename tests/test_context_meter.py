@@ -409,3 +409,16 @@ def test_red_eta_ignores_idle_gap(env):
     # -> ~47.6 tok/s; 30k tokens to red (85% of 200k) -> ~10m.
     # Without idle capping the span would be ~3780s -> a wildly wrong ~47m.
     assert "red ~10m" in out
+
+
+def test_next_estimate_weights_recent_turns(env):
+    now = time.time()
+    # growths oldest->newest: 9k, 9k, 1k, 1k — the pace has slowed.
+    seed_state(env, "recent", {"samples": [
+        [100_000, now - 50], [109_000, now - 40], [118_000, now - 30],
+        [119_000, now - 20], [120_000, now - 10],
+    ]})
+    out = run(payload_tokens("recent", 120_000))   # == last sample: no new growth
+    # plain median of [9k,9k,1k,1k] = 5k -> next ~62%; recency-weighted
+    # median = 1k -> next ~60%. Span < MIN_ETA_SPAN so next~ (not red~) shows.
+    assert "next ~60%" in out

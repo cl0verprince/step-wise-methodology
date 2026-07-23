@@ -166,10 +166,18 @@ def _step_segment(root: Path, state: dict) -> str | None:
     return seg
 
 
-def _median(values: list) -> float:
-    vs = sorted(values)
-    mid = len(vs) // 2
-    return float(vs[mid]) if len(vs) % 2 else (vs[mid - 1] + vs[mid]) / 2
+def _wmedian(values: list) -> float:
+    """Recency-weighted median: the i-th value (oldest first) carries weight
+    i+1, so a change of pace shows quickly while one huge turn still can't
+    dominate the estimate."""
+    pairs = sorted(zip(values, range(1, len(values) + 1)))
+    half = sum(w for _, w in pairs) / 2
+    acc = 0.0
+    for v, w in pairs:
+        acc += w
+        if acc >= half:
+            return float(v)
+    return float(pairs[-1][0])
 
 
 def _state_path(session_id: str) -> Path:
@@ -234,7 +242,7 @@ def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
     growths = _growths(samples)
     if not growths:
         return None
-    return min(used_tokens + round(_median(growths)), window)
+    return min(used_tokens + round(_wmedian(growths)), window)
 
 
 def _red_eta(samples: list, used_tokens: int, window: int) -> float | None:
