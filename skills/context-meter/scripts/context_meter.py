@@ -79,6 +79,12 @@ def _light(pct: float) -> str:
     return "🔴"
 
 
+def _hidden() -> set:
+    """Segment names the user opted out of, e.g. HIDE='branch,model'."""
+    raw = os.environ.get("CLAUDE_CONTEXT_METER_HIDE", "")
+    return {s.strip().lower() for s in raw.split(",") if s.strip()}
+
+
 def _short_model(data: dict) -> str | None:
     """'Claude Fable 5' -> 'fable'. Family word if recognized, else first word."""
     name = ((data.get("model") or {}).get("display_name") or "").strip()
@@ -318,15 +324,16 @@ def _session_elapsed(state: dict) -> float | None:
     return elapsed if elapsed >= 0 else None
 
 
-def _session_suffix(state: dict) -> str:
+def _session_suffix(state: dict, hide: set) -> str:
     """' · 23 turns · 1h42m' from the tallied transcript state, or ''."""
     t = state.get("transcript") or {}
     parts = []
-    if t.get("turns"):
+    if t.get("turns") and "turns" not in hide:
         parts.append(f"{t['turns']} turn{'s' if t['turns'] != 1 else ''}")
-    elapsed = _session_elapsed(state)
-    if elapsed is not None:
-        parts.append(_fmt_duration(elapsed))
+    if "duration" not in hide:
+        elapsed = _session_elapsed(state)
+        if elapsed is not None:
+            parts.append(_fmt_duration(elapsed))
     return ("".join(f" · {p}" for p in parts)) if parts else ""
 
 
@@ -354,6 +361,8 @@ def render(data: dict) -> str:
     session_id = data.get("session_id", "")
     state_file = _state_path(session_id) if session_id else None
     state = _load_state(state_file) if state_file else {}
+
+    hide = _hidden()
 
     samples = _append_sample(state, used_tokens, time.time())
     predicted = _predict_next(samples, used_tokens, window)
@@ -390,26 +399,27 @@ def render(data: dict) -> str:
         line += " → handoff?"
 
     model = _short_model(data)
-    if model:
+    if model and "model" not in hide:
         line += f" · {model}"
 
-    if branch:
+    if branch and "branch" not in hide:
         line += f" · {branch}"
 
-    if step:
+    if step and "step" not in hide:
         line += f" · {step}"
 
-    line += _session_suffix(state)
+    line += _session_suffix(state, hide)
 
     cost = (data.get("cost") or {}).get("total_cost_usd")
     if isinstance(cost, (int, float)) and cost > 0:
-        line += f" · ${cost:.2f}"
+        if "cost" not in hide:
+            line += f" · ${cost:.2f}"
         elapsed = _session_elapsed(state)
-        if elapsed and elapsed >= BURN_MIN_AGE:
+        if "burn" not in hide and elapsed and elapsed >= BURN_MIN_AGE:
             line += f" · ${cost / (elapsed / 3600):.2f}/h"
 
     compactions = state.get("compactions", 0)
-    if compactions:
+    if compactions and "compactions" not in hide:
         line += f" ↺{compactions}"
     return line
 

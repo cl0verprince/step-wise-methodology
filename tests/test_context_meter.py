@@ -361,3 +361,36 @@ def test_burn_rate_hidden_early(env):
     p["cost"] = {"total_cost_usd": 0.10}
     out = run(p)
     assert "$0.10" in out and "/h" not in out
+
+
+def run_env(payload, extra_env):
+    import os as _os
+    data = json.dumps(payload).encode()
+    p = subprocess.run(
+        [sys.executable, SCRIPT], input=data, capture_output=True, timeout=15,
+        env={**_os.environ, **extra_env},
+    )
+    assert p.returncode == 0, p.stderr
+    return p.stdout.decode("utf-8")
+
+
+def test_hide_segments(env, tmp_path):
+    proj = project_with_git(tmp_path, "hideproj")
+    p = branch_payload("hide1", proj)
+    p["model"] = {"display_name": "Claude Fable 5"}
+    p["cost"] = {"total_cost_usd": 0.42}
+    out = run_env(p, {
+        "CLAUDE_CONTEXT_METER_DIR": str(env / "state"),
+        "CLAUDE_CONTEXT_METER_HIDE": "model,branch,cost",
+    })
+    assert "fable" not in out
+    assert "main" not in out
+    assert "$" not in out
+
+
+def test_hide_unset_shows_everything(env, tmp_path):
+    proj = project_with_git(tmp_path, "showproj")
+    p = branch_payload("hide2", proj)
+    p["model"] = {"display_name": "Claude Fable 5"}
+    out = run(p)
+    assert "· fable" in out and "· main" in out
