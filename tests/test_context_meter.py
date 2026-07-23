@@ -224,6 +224,11 @@ def test_model_segment_unknown_family(env):
     assert "· futuremodel" in out
 
 
+def test_non_dict_workspace_degrades_gracefully(env):
+    out = run(payload_tokens("ws1", 98_000, extra={"workspace": "oops"}))
+    assert out.startswith("🟢 49% (98k/200k)")
+
+
 def test_model_absent_no_segment(env):
     # No model, transcript, or cost: the line is exactly the gauge.
     assert run(payload_tokens("model3", 98_000)) == "🟢 49% (98k/200k)"
@@ -262,6 +267,14 @@ def test_branch_detached_head(env, tmp_path):
     (proj / ".git" / "HEAD").write_text("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n", encoding="utf-8")
     out = run(branch_payload("br3", proj))
     assert "· a1b2c3d" in out
+
+
+def test_branch_with_slash(env, tmp_path):
+    proj = tmp_path / "slashy"
+    (proj / ".git").mkdir(parents=True)
+    (proj / ".git" / "HEAD").write_text("ref: refs/heads/feature/login\n", encoding="utf-8")
+    out = run(branch_payload("br5", proj))
+    assert "· feature/login" in out
 
 
 def test_no_git_no_branch_segment(env, tmp_path):

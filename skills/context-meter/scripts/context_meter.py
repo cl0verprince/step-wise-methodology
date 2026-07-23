@@ -124,7 +124,8 @@ def _project_root(start: str) -> Path | None:
         for candidate in (p, *p.parents):
             if (candidate / ".git").exists() or (candidate / "workflow.json").is_file():
                 return candidate
-    except OSError:
+    except Exception:
+        # A bad path must cost only the branch/step segments, never the line.
         pass
     return None
 
@@ -144,7 +145,10 @@ def _git_branch(root: Path) -> str | None:
     except OSError:
         return None
     if head.startswith("ref: "):
-        return head.rsplit("/", 1)[-1] or None
+        ref = head[len("ref: "):].strip()
+        if ref.startswith("refs/heads/"):
+            return ref[len("refs/heads/"):] or None
+        return ref.rsplit("/", 1)[-1] or None
     return head[:7] or None
 
 
@@ -277,7 +281,7 @@ def _red_eta(samples: list, used_tokens: int, window: int, red_pct: float) -> fl
     growth_count = 0
     span_eff = 0.0
     for (a, t1), (b, t2) in zip(samples, samples[1:]):
-        span_eff += min(t2 - t1, IDLE_GAP)
+        span_eff += min(max(t2 - t1, 0.0), IDLE_GAP)
         if b > a:                             # compaction drops filtered out
             growth_total += b - a
             growth_count += 1
@@ -405,9 +409,10 @@ def render(data: dict) -> str:
     except Exception:
         pass                                  # tally is a bonus, never a risk
 
-    root = _project_root(
-        (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
-    )
+    ws = data.get("workspace")
+    ws = ws if isinstance(ws, dict) else {}
+    cwd = ws.get("current_dir") or data.get("cwd")
+    root = _project_root(cwd if isinstance(cwd, str) else "")
     branch = _git_branch(root) if root else None
     step = _step_segment(root, state) if root else None
 
