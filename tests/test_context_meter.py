@@ -269,3 +269,55 @@ def test_no_git_no_branch_segment(env, tmp_path):
     plain.mkdir()
     out = run(branch_payload("br4", plain))
     assert "feature" not in out and "· a1b2c3d" not in out
+
+
+def project_with_git(tmp_path, name="p"):
+    proj = tmp_path / name
+    (proj / ".git").mkdir(parents=True)
+    (proj / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    return proj
+
+
+def test_step_segment_in_progress(env, tmp_path):
+    proj = project_with_git(tmp_path)
+    (proj / "workflow.json").write_text(json.dumps({"steps": [
+        {"name": "a", "status": "done"},
+        {"name": "b", "status": "in_progress"},
+        {"name": "c", "status": "pending"},
+    ]}), encoding="utf-8")
+    out = run(branch_payload("st1", proj))
+    assert "· step 2/3" in out
+
+
+def test_step_segment_awaiting_approval_counts_as_current(env, tmp_path):
+    proj = project_with_git(tmp_path, "p2")
+    (proj / "workflow.json").write_text(json.dumps({"steps": [
+        {"name": "a", "status": "done"},
+        {"name": "b", "status": "awaiting_approval"},
+        {"name": "c", "status": "pending"},
+    ]}), encoding="utf-8")
+    out = run(branch_payload("st2", proj))
+    assert "· step 2/3" in out
+
+
+def test_step_segment_all_done(env, tmp_path):
+    proj = project_with_git(tmp_path, "p3")
+    (proj / "workflow.json").write_text(json.dumps({"steps": [
+        {"name": "a", "status": "done"},
+        {"name": "b", "status": "done"},
+    ]}), encoding="utf-8")
+    out = run(branch_payload("st3", proj))
+    assert "· step 2/2" in out
+
+
+def test_no_workflow_no_step_segment(env, tmp_path):
+    proj = project_with_git(tmp_path, "p4")
+    out = run(branch_payload("st4", proj))
+    assert "step " not in out
+
+
+def test_broken_workflow_never_crashes(env, tmp_path):
+    proj = project_with_git(tmp_path, "p5")
+    (proj / "workflow.json").write_text("{not json", encoding="utf-8")
+    out = run(branch_payload("st5", proj))
+    assert out.startswith("🟢") and "step " not in out

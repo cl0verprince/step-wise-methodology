@@ -123,6 +123,41 @@ def _git_branch(root: Path) -> str | None:
     return head[:7] or None
 
 
+def _step_segment(root: Path, state: dict) -> str | None:
+    """'step 3/7' from the project's workflow.json (the methodology's canonical
+    step status). First in_progress step wins; else the first not-done step;
+    all done -> total/total. Parsed only when the file's mtime changes."""
+    wf = root / "workflow.json"
+    try:
+        mtime = wf.stat().st_mtime
+    except OSError:
+        return None
+    cache = state.get("workflow") or {}
+    if cache.get("path") == str(wf) and cache.get("mtime") == mtime:
+        return cache.get("seg")
+    seg = None
+    try:
+        steps = (json.loads(wf.read_text(encoding="utf-8")) or {}).get("steps") or []
+        total = len(steps)
+        if total:
+            current = next(
+                (i for i, s in enumerate(steps, 1)
+                 if isinstance(s, dict) and s.get("status") == "in_progress"),
+                None,
+            )
+            if current is None:
+                current = next(
+                    (i for i, s in enumerate(steps, 1)
+                     if isinstance(s, dict) and s.get("status") != "done"),
+                    total,
+                )
+            seg = f"step {current}/{total}"
+    except (OSError, ValueError):
+        seg = None
+    state["workflow"] = {"path": str(wf), "mtime": mtime, "seg": seg}
+    return seg
+
+
 def _median(values: list) -> float:
     vs = sorted(values)
     mid = len(vs) // 2
@@ -324,6 +359,7 @@ def render(data: dict) -> str:
         (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
     )
     branch = _git_branch(root) if root else None
+    step = _step_segment(root, state) if root else None
 
     if state_file:
         _save_state(state_file, state)
@@ -351,6 +387,9 @@ def render(data: dict) -> str:
 
     if branch:
         line += f" · {branch}"
+
+    if step:
+        line += f" · {step}"
 
     line += _session_suffix(state)
 
