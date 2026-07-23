@@ -45,11 +45,14 @@ A step-wise project's durable state is four small root files, each owning exactl
 **The re-entry rule:** every skill detects before it creates. If its artifact already exists it reconciles and extends — it never re-scaffolds. Invoked on an existing project, `stepwise-delivery` reads these four files first, reports where the project stands, and resumes at the right phase.
 
 The **`context-meter`** ships a bundled, stdlib-only status-line script
-(`skills/context-meter/scripts/context_meter.py`): a 🟢/🟡/🔴 traffic light with
-the live token count, the true window size (200k or 1M), and an estimate of
-where context lands after the next turn — rendered at the bottom of the Claude
-Code pane inside PyCharm / VS Code. See its `SKILL.md` for the one-line
-`settings.json` block to enable it.
+(`skills/context-meter/scripts/context_meter.py`): a 🟢/🟡/🔴 traffic light,
+live token count and window size, and a full dashboard line — model, git
+branch, current `workflow.json` step, turn count and session duration, cost
+and burn rate, and a time-to-red ETA against a red line that adapts to the
+compaction point actually observed on this machine — rendered at the bottom
+of the Claude Code pane inside PyCharm / VS Code. Setup is agent-led: ask
+Claude to enable it and it wires the `settings.json` `statusLine` block for
+you; see its `SKILL.md` for details.
 
 ## License
 

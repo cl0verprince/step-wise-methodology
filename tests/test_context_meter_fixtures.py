@@ -5,7 +5,6 @@ exactly as Claude Code would; <case>.expected.txt is the exact line it must
 print. Fixtures use payload-only features (no transcript, no git dir, fresh
 state) so they are fully deterministic.
 """
-import json
 import os
 import subprocess
 import sys
@@ -26,12 +25,14 @@ CASES = sorted(FIXTURES.glob("*.input.json"))
 )
 def test_golden(case, tmp_path):
     expected = case.with_name(case.name.replace(".input.json", ".expected.txt"))
+    env = {**os.environ, "CLAUDE_CONTEXT_METER_DIR": str(tmp_path)}
+    env.pop("CLAUDE_CONTEXT_METER_HIDE", None)
     p = subprocess.run(
         [sys.executable, SCRIPT],
         input=case.read_bytes(),
         capture_output=True,
         timeout=15,
-        env={**os.environ, "CLAUDE_CONTEXT_METER_DIR": str(tmp_path)},
+        env=env,
     )
     assert p.returncode == 0, p.stderr
     assert p.stdout.decode("utf-8") == expected.read_text(encoding="utf-8").rstrip("\n")

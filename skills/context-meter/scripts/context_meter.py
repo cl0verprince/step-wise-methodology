@@ -5,17 +5,22 @@ https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
 
     🟡 71% (142k/200k) · red ~35m · opus · main · step 3/7 · 23 turns · 1h42m · $0.42 · $0.25/h ↺1
 
-- Traffic light 🟢/🟡/🔴 for how full the context window is right now.
+- Traffic light 🟢/🟡/🔴 for how full the context window is right now (the
+  red line adapts to the compaction point actually observed on this machine).
 - Live token count and the true window size (200k or the extended 1M).
 - "red ~35m" — estimated time until usage crosses the red line, from the
-  median growth rate of recent turns. Shown only once there is enough
-  history to be honest (else it falls back to "next ~N%", the estimated
-  usage after one more turn). "→ handoff?" appears when usage is at or
-  predicted to cross red — the cue to run the session-handoff skill.
+  recency-weighted growth of recent turns with idle gaps capped. Shown only
+  once there is enough history to be honest (else "next ~N%" steps in).
+  "→ handoff?" appears at (or predicted to cross) red — the cue to run the
+  session-handoff skill.
+- "opus · main · step 3/7" — model, git branch (read from .git/HEAD, no
+  subprocess), and the current step from workflow.json when present.
 - "23 turns · 1h42m" — exchanges (real user prompts) and session runtime,
   from the transcript JSONL.
-- "$0.42" — session cost, when the payload carries a cost block.
-- "↺1" — how many context compactions have been detected this session.
+- "$0.42 · $0.25/h" — session cost and its burn rate (once the session is
+  10+ minutes old), when the payload carries a cost block.
+- "↺1" — context compactions detected this session.
+- CLAUDE_CONTEXT_METER_HIDE="branch,model,…" hides individual segments.
 
 Token math comes from the stdin JSON alone. The transcript is read
 INCREMENTALLY: a byte offset is kept per session, so each status-line tick
@@ -86,7 +91,7 @@ def _light(pct: float, red_pct: float) -> str:
 
 def _red_pct(state: dict) -> float:
     """The effective red line: the configured constant, pulled down toward the
-    lowest usage %% at which this machine actually compacted (minus a margin).
+    lowest usage % at which this machine actually compacted (minus a margin).
     Observed truth beats the guessed constant."""
     pcts = [
         p for p in (state.get("compaction_pcts") or [])
@@ -263,7 +268,8 @@ def _growths(samples: list) -> list:
 
 
 def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
-    """Median-growth estimate of next-turn usage (robust to one huge turn)."""
+    """Recency-weighted median-growth estimate of next-turn usage (robust to
+    one huge turn)."""
     growths = _growths(samples)
     if not growths:
         return None

@@ -28,6 +28,7 @@ def jline(**kw) -> str:
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONTEXT_METER_DIR", str(tmp_path / "state"))
+    monkeypatch.delenv("CLAUDE_CONTEXT_METER_HIDE", raising=False)
     return tmp_path
 
 
@@ -456,3 +457,36 @@ def test_default_red_line_without_observations(env):
     out = run(payload_tokens("plain84", 168_000))  # 84% < default red 85%
     assert out.startswith("🟡 84% (")
     assert "handoff" not in out
+
+
+def test_hide_burn_only(env):
+    t = env / "t2.jsonl"
+    t.write_text("\n".join(transcript_lines()) + "\n", encoding="utf-8")
+    p = payload_for(t, session="hb1")
+    p["cost"] = {"total_cost_usd": 0.42}
+    out = run_env(p, {
+        "CLAUDE_CONTEXT_METER_DIR": str(env / "state"),
+        "CLAUDE_CONTEXT_METER_HIDE": "burn",
+    })
+    assert "· $0.42" in out and "/h" not in out
+
+
+def test_hide_step_turns_duration_compactions(env, tmp_path):
+    proj = project_with_git(tmp_path, "hideall")
+    (proj / "workflow.json").write_text(
+        json.dumps({"steps": [{"name": "a", "status": "in_progress"}]}), encoding="utf-8"
+    )
+    t = env / "t3.jsonl"
+    t.write_text("\n".join(transcript_lines()) + "\n", encoding="utf-8")
+    t0 = time.time() - 120
+    seed_state(env, "hide3", {"samples": [[100_000, t0], [120_000, t0 + 60]]})
+    p = branch_payload("hide3", proj, inp=60_000)
+    p["transcript_path"] = str(t)
+    out = run_env(p, {
+        "CLAUDE_CONTEXT_METER_DIR": str(env / "state"),
+        "CLAUDE_CONTEXT_METER_HIDE": "step,turns,duration,compactions,branch",
+    })
+    assert "step " not in out
+    assert "turns" not in out
+    assert "1h" not in out
+    assert "↺" not in out

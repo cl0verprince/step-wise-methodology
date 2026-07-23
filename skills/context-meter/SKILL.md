@@ -70,8 +70,9 @@ per-turn growth) until it has at least 3 growth samples over ≥60s. The real
 unknown is how big the next tool result is — genuinely unpredictable — so
 treat both as trend signals ("am I about to run out of room?"), not promises.
 Thresholds live as named constants (`GREEN_BELOW`, `YELLOW_BELOW`,
-`MIN_ETA_GROWTHS`, `MIN_ETA_SPAN`) at the top of the script; change them
-there if your compaction point differs.
+`MIN_ETA_GROWTHS`, `MIN_ETA_SPAN`, `IDLE_GAP`, `BURN_MIN_AGE`, `RED_MARGIN`,
+`RED_FLOOR`) at the top of the script; change them there if your compaction
+point differs.
 
 ## Enable it (agent-led — just approve)
 Ask Claude to enable the context meter; it will:
