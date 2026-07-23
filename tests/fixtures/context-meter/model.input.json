@@ -1,0 +1,9 @@
+{
+  "session_id": "fx-model",
+  "context_window": {
+    "context_window_size": 200000,
+    "total_input_tokens": 130000,
+    "total_output_tokens": 12000
+  },
+  "model": {"id": "claude-sonnet-5", "display_name": "Claude Sonnet 5"}
+}

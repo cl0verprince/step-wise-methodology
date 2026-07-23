@@ -3,7 +3,7 @@
 Reads the status-line JSON on stdin (documented at
 https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
 
-    🟡 71% ctx (142k/200k) · red ~35m · 23 turns · 1h42m · $0.42 ↺1
+    🟡 71% (142k/200k) · red ~35m · opus · 23 turns · 1h42m · $0.42 ↺1
 
 - Traffic light 🟢/🟡/🔴 for how full the context window is right now.
 - Live token count and the true window size (200k or the extended 1M).
@@ -76,6 +76,18 @@ def _light(pct: float) -> str:
     if pct < YELLOW_BELOW:
         return "🟡"
     return "🔴"
+
+
+def _short_model(data: dict) -> str | None:
+    """'Claude Fable 5' -> 'fable'. Family word if recognized, else first word."""
+    name = ((data.get("model") or {}).get("display_name") or "").strip()
+    if not name:
+        return None
+    low = name.lower()
+    for family in ("fable", "opus", "sonnet", "haiku", "mythos"):
+        if family in low:
+            return family
+    return low.split()[0][:12]
 
 
 def _median(values: list) -> float:
@@ -279,7 +291,7 @@ def render(data: dict) -> str:
         _save_state(state_file, state)
 
     line = (
-        f"{_light(used_pct)} {round(used_pct)}% ctx "
+        f"{_light(used_pct)} {round(used_pct)}% "
         f"({_fmt_tokens(used_tokens)}/{_fmt_tokens(window)})"
     )
     # Trajectory: the time-to-red ETA when history can carry it, else the
@@ -294,6 +306,10 @@ def render(data: dict) -> str:
     pred_pct = predicted / window * 100 if predicted is not None else 0
     if used_pct >= YELLOW_BELOW or pred_pct >= YELLOW_BELOW:
         line += " → handoff?"
+
+    model = _short_model(data)
+    if model:
+        line += f" · {model}"
 
     line += _session_suffix(state)
 

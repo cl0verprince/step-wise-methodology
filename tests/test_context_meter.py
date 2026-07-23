@@ -69,7 +69,7 @@ def test_first_tick_counts_turns_and_duration(env):
     t = env / "t.jsonl"
     t.write_text("\n".join(transcript_lines()) + "\n", encoding="utf-8")
     out = run(payload_for(t))
-    assert out.startswith("🟢 10% ctx (98k/1.0M)")
+    assert out.startswith("🟢 10% (98k/1.0M)")
     assert "3 turns" in out          # meta + tool results excluded
     assert "1h4" in out              # ~1h42m elapsed
 
@@ -100,7 +100,7 @@ def test_incremental_append_and_torn_line(env):
 
 def test_missing_transcript_is_graceful(env):
     out = run(payload_for(env / "nope.jsonl"))
-    assert out.startswith("🟢 10% ctx")
+    assert out.startswith("🟢 10% (")
     assert "turns" not in out
 
 
@@ -113,7 +113,7 @@ def test_no_transcript_path_key(env):
             "total_output_tokens": 0,
         },
     })
-    assert out.startswith("🔴 90% ctx")
+    assert out.startswith("🔴 90% (")
 
 
 def test_garbage_stdin_never_crashes(env):
@@ -167,7 +167,7 @@ def test_next_fallback_when_history_thin(env):
 
 def test_handoff_cue_at_red(env):
     out = run(payload_tokens("red", 180_000))
-    assert out.startswith("🔴 90% ctx")
+    assert out.startswith("🔴 90% (")
     assert "→ handoff?" in out
 
 
@@ -188,7 +188,7 @@ def test_cost_segment_feature_detected(env):
 def test_pre_07_int_samples_reset_not_crash(env):
     seed_state(env, "old", {"samples": [90_000, 110_000, 130_000]})
     out = run(payload_tokens("old", 140_000))
-    assert out.startswith("🟡 70% ctx")
+    assert out.startswith("🟡 70% (")
 
 
 def test_big_transcript_incremental_tick_is_fast(env):
@@ -202,3 +202,28 @@ def test_big_transcript_incremental_tick_is_fast(env):
     t0 = time.perf_counter()
     run(p)
     assert time.perf_counter() - t0 < 2.0     # incremental tick (mostly startup)
+
+
+def test_v3_line_drops_ctx_label(env):
+    out = run(payload_tokens("fmt", 98_000))
+    assert out.startswith("🟢 49% (98k/200k)")
+    assert " ctx (" not in out
+
+
+def test_model_segment(env):
+    out = run(payload_tokens("model", 98_000, extra={
+        "model": {"id": "claude-fable-5", "display_name": "Claude Fable 5"},
+    }))
+    assert "· fable" in out
+
+
+def test_model_segment_unknown_family(env):
+    out = run(payload_tokens("model2", 98_000, extra={
+        "model": {"display_name": "Futuremodel XL 9"},
+    }))
+    assert "· futuremodel" in out
+
+
+def test_model_absent_no_segment(env):
+    # No model, transcript, or cost: the line is exactly the gauge.
+    assert run(payload_tokens("model3", 98_000)) == "🟢 49% (98k/200k)"
