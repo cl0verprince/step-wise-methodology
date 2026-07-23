@@ -3,7 +3,7 @@
 Reads the status-line JSON on stdin (documented at
 https://code.claude.com/docs/en/statusline.md) and prints ONE compact line:
 
-    🟡 71% (142k/200k) · red ~35m · opus · 23 turns · 1h42m · $0.42 ↺1
+    🟡 71% (142k/200k) · red ~35m · opus · main · step 3/7 · 23 turns · 1h42m · $0.42 · $0.25/h ↺1
 
 - Traffic light 🟢/🟡/🔴 for how full the context window is right now.
 - Live token count and the true window size (200k or the extended 1M).
