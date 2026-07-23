@@ -394,3 +394,18 @@ def test_hide_unset_shows_everything(env, tmp_path):
     p["model"] = {"display_name": "Claude Fable 5"}
     out = run(p)
     assert "· fable" in out and "· main" in out
+
+
+def test_red_eta_ignores_idle_gap(env):
+    now = time.time()
+    seed_state(env, "idle", {"samples": [
+        [100_000, now - 3780],
+        [110_000, now - 3720],
+        [120_000, now - 3660],   # then a 1h lunch break
+        [130_000, now - 120],
+    ]})
+    out = run(payload_tokens("idle", 140_000))
+    # growths 4x10k over an effective span of 60+60+600(capped)+~120 ≈ 840s
+    # -> ~47.6 tok/s; 30k tokens to red (85% of 200k) -> ~10m.
+    # Without idle capping the span would be ~3780s -> a wildly wrong ~47m.
+    assert "red ~10m" in out

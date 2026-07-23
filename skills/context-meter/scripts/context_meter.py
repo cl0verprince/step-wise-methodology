@@ -49,6 +49,7 @@ YELLOW_BELOW = 85     # 60–85% -> 🟡 ; >= 85% -> 🔴 (also the handoff cue 
 MAX_SAMPLES = 12      # rolling history kept per session for the estimates
 MIN_ETA_GROWTHS = 3   # growth samples needed before "red ~Xm" is honest
 MIN_ETA_SPAN = 60.0   # seconds of history needed before a rate means anything
+IDLE_GAP = 600.0      # cap each inter-sample gap at 10min in burn-rate math
 BURN_MIN_AGE = 600.0  # seconds of session age before $/h is meaningful
 
 
@@ -239,22 +240,24 @@ def _predict_next(samples: list, used_tokens: int, window: int) -> int | None:
 def _red_eta(samples: list, used_tokens: int, window: int) -> float | None:
     """Seconds until usage crosses the red line, from the observed burn rate.
 
-    Only answers when the history can carry the claim: enough growth samples,
-    over a long-enough wall-clock span, with red still ahead.
+    Idle-aware: each gap between samples contributes at most IDLE_GAP seconds
+    to the span, so a lunch break doesn't dilute the rate into a promise of
+    hours of runway. Only answers when the history can carry the claim.
     """
-    growths = _growths(samples)
-    if len(growths) < MIN_ETA_GROWTHS:
-        return None
-    span = samples[-1][1] - samples[0][1]
-    if span < MIN_ETA_SPAN:
+    growth_total = 0
+    growth_count = 0
+    span_eff = 0.0
+    for (a, t1), (b, t2) in zip(samples, samples[1:]):
+        span_eff += min(t2 - t1, IDLE_GAP)
+        if b > a:                             # compaction drops filtered out
+            growth_total += b - a
+            growth_count += 1
+    if growth_count < MIN_ETA_GROWTHS or span_eff < MIN_ETA_SPAN:
         return None
     tokens_to_red = window * YELLOW_BELOW / 100 - used_tokens
-    if tokens_to_red <= 0:
+    if tokens_to_red <= 0 or growth_total <= 0:
         return None
-    rate = sum(growths) / span            # tokens per second, net of compactions
-    if rate <= 0:
-        return None
-    return tokens_to_red / rate
+    return tokens_to_red / (growth_total / span_eff)
 
 
 def _tally_transcript(state: dict, transcript_path: str) -> None:
